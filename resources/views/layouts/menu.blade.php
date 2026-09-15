@@ -411,6 +411,16 @@
                                         </a>
                                     </li>`;
                                     break;
+
+                                case "Customer Subscriptions":
+                                    menuHtml = `
+                                    <li>
+                                        <a class="waves-effect waves-dark" href="{!! route('customer-subscriptions') !!}" aria-expanded="false">
+                                            <i class="mdi mdi-ticket-account"></i>
+                                            <span class="hide-menu">{{ trans('lang.customer_subscription_plural') }}</span>
+                                        </a>
+                                    </li>`;
+                                    break;
                                 case "Special Discounts":   
                                     if (specialOffer) {
                                         menuHtml += `<li class="{{ request()->routeIs('specialOffer') ? 'active' : '' }}">

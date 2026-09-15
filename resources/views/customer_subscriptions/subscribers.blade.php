@@ -81,6 +81,10 @@
     document.addEventListener("DOMContentLoaded", async function () {
         jQuery("#data-table_processing").show();
 
+        if (!await employeeMayView()) {
+            return;
+        }
+
         var vendor = await loadVendorRecord();
         if (vendor == null) {
             jQuery("#data-table_processing").hide();
@@ -188,6 +192,30 @@
         }
 
         return snapshots.docs[0].data();
+    }
+
+    /* An employee reaches these screens only if their role allows it. The menu
+     * already hides the entry, but the routes are reachable by URL, so the check
+     * belongs on the screen as well - the same pattern the other employee-gated
+     * screens use. */
+    async function employeeMayView() {
+        if (authRole !== 'employee') {
+            return true;
+        }
+
+        var perm = await getEmployeePermissionForTitle(vendorUserId, "Customer Subscriptions");
+
+        if (perm && perm.isActive) {
+            return true;
+        }
+
+        alert('{{ trans("lang.no_permission") }}');
+        jQuery("#data-table_processing").hide();
+        $('.page-menu, .vendor_payout_create, .btm-btn').html(
+            '<p class="text-center text-danger font-weight-bold">{{ trans("lang.no_permission") }}</p>'
+        );
+
+        return false;
     }
 </script>
 @endsection

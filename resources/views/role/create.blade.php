@@ -193,6 +193,15 @@
                                                                 </td>
                                                             </tr>
 
+                                                            <!-- 15. Customer Subscriptions -->
+                                                            <tr>
+                                                                <td><strong>{{ trans('lang.customer_subscription_plural') }}</strong></td>
+                                                                <td>
+                                                                    <input type="checkbox" class="permission" id="customer_subscription_manage" data-title="Customer Subscriptions" data-action="isActive">
+                                                                    <label class="control-label2" for="customer_subscription_manage">{{trans('lang.allow_to_manage')}}</label>
+                                                                </td>
+                                                            </tr>
+
                                                         </tbody>
                                                     </table>
                                                 </div>
