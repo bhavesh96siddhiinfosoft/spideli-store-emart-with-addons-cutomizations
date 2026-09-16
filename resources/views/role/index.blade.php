@@ -87,46 +87,12 @@
         });
     });
 
+    /* Delegates to resolveCurrentStoreId() in layouts/app.blade.php. It also
+     * assigns the page-level vendorId, because the code below reads that
+     * variable directly rather than the resolved value. */
     async function getVendorId() {
-        return new Promise((resolve, reject) => {
-            if(authRole == 'vendor'){
-                database.collection('vendors')
-                    .where('author', "==", vendorUserId)
-                    .get()
-                    .then(function(vendorSnapshots) {
-                        if (!vendorSnapshots.empty) {
-                            var vendorData = vendorSnapshots.docs[0].data();
-                            vendorId = vendorData.id;
-                            resolve(vendorId);
-                        } else {
-                            console.error("Vendor not found");
-                            resolve(null);
-                        }
-                    })
-                    .catch(function(error) {
-                        console.error("Error getting vendor:", error);
-                        reject(error);
-                    });
-            }else{
-                database.collection('vendors')
-                    .where('id', "==", empVendorId)
-                    .get()
-                    .then(function(vendorSnapshots) {
-                        if (!vendorSnapshots.empty) {
-                            var vendorData = vendorSnapshots.docs[0].data();
-                            vendorId = vendorData.id;
-                            resolve(vendorId);
-                        } else {
-                            console.error("Vendor not found");
-                            resolve(null);
-                        }
-                    })
-                    .catch(function(error) {
-                        console.error("Error getting vendor:", error);
-                        reject(error);
-                    });
-            }
-        });
+        vendorId = await resolveCurrentStoreId(vendorUserId);
+        return vendorId;
     }
 
     function initializeDataTable() {

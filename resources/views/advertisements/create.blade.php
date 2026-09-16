@@ -199,10 +199,13 @@
         let currentPermissions = {
             isActive: true   
         };
-        database.collection('vendors').where('author', "==", vendorUserId).get().then(async function(vendorSnapshots) {
-            if (vendorSnapshots.docs.length > 0) {
+        /* The store comes from resolveCurrentStore() in layouts/app.blade.php - the
+         * one place that knows which store the panel is working on. The body
+         * below is unchanged; only where the record comes from has moved. */
+        resolveCurrentStore(vendorUserId).then(async function(store) {
+            if (store) {
 
-                vendorData = vendorSnapshots.docs[0].data();
+                vendorData = store;
                 vendorId = vendorData.id;
                 var reviewsCount = 0;
                 var rating = 0;

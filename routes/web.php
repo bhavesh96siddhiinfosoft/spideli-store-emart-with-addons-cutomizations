@@ -85,7 +85,18 @@ Route::middleware(['check.subscription'])->group(function () {
 
     Route::get('/users/edit/{id}', [App\Http\Controllers\UserController::class, 'edit'])->name('users.edit');
 
+    // The single-store screen. Kept so existing links and bookmarks still work;
+    // the sidebar now points at the stores list instead.
     Route::get('/store', [App\Http\Controllers\UserController::class, 'profile'])->name('store');
+
+    // A vendor account may own several stores - see docs/app-spec-multiple-stores.md
+    Route::get('/stores', [App\Http\Controllers\StoreController::class, 'index'])->name('stores');
+
+    Route::get('/stores/create', [App\Http\Controllers\StoreController::class, 'create'])->name('stores.create');
+
+    Route::get('/stores/edit/{id}', [App\Http\Controllers\StoreController::class, 'edit'])->name('stores.edit');
+
+    Route::get('/stores/view/{id}', [App\Http\Controllers\StoreController::class, 'view'])->name('stores.view');
 
     Route::get('/categories/edit/{id}', [App\Http\Controllers\CategoryController::class, 'edit'])->name('categories.edit');
 

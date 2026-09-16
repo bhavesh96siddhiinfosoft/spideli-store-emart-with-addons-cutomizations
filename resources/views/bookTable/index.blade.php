@@ -105,7 +105,7 @@
         isActive: true   
     };
     var empVendorId = "{{ $empVendorId }}";
-    var refCurrency = database.collection('currencies').where('isActive', '==', true);
+    var refCurrency = storeCurrencyRef();
     refCurrency.get().then(async function(snapshots) {
         var currencyData = snapshots.docs[0].data();
         currentCurrency = currencyData.symbol;
@@ -493,22 +493,10 @@
     });
 
 
+    /* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+     * place that knows which store the panel is working on. */
     async function getVendorId(vendorUser) {
-        var vendorId = '';
-        var ref;
-        if(authRole == 'vendor'){
-            var vendorSnapshots = await database.collection('vendors').where('author', "==", vendorUser).get();
-            var vendorData = vendorSnapshots.docs[0].data();
-            vendorId = vendorData.id;
-            
-        }else{
-            var vendorSnapshots = await database.collection('vendors').where('id', "==", empVendorId).get();
-            var vendorData = vendorSnapshots.docs[0].data();
-            vendorId = vendorData.id;
-           
-        }
-
-        return vendorId;
+        return await resolveCurrentStoreId(vendorUser);
     }
 
 </script>

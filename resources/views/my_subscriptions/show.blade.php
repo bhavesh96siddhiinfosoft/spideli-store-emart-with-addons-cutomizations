@@ -107,7 +107,7 @@
         var ref = database.collection('subscription_history').where("id", "==", id);
         var currentCurrency = '';
         var currencyAtRight = false;
-        var refCurrency = database.collection('currencies').where('isActive', '==', true);
+        var refCurrency = storeCurrencyRef();
         var decimal_degits = 0;
         refCurrency.get().then(async function(snapshots) {
             var currencyData = snapshots.docs[0].data();

@@ -501,7 +501,7 @@
         var total_price = 0;
         var currentCurrency = '';
         var currencyAtRight = false;
-        var refCurrency = database.collection('currencies').where('isActive', '==', true);
+        var refCurrency = storeCurrencyRef();
         var orderPreviousStatus = '';
         var orderPaymentMethod = '';
         var orderCustomerId = '';

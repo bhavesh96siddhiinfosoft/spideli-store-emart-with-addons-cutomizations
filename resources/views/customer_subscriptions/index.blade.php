@@ -91,7 +91,7 @@
     var currencyAtRight = false;
     var decimal_degits = 0;
 
-    database.collection('currencies').where('isActive', '==', true).get().then(function (snapshots) {
+    storeCurrencyRef().get().then(function (snapshots) {
         var currencyData = snapshots.docs[0].data();
         currentCurrency = currencyData.symbol;
         currencyAtRight = currencyData.symbolAtRight;
@@ -193,20 +193,11 @@
         return currencyAtRight ? amount + '' + currentCurrency : currentCurrency + '' + amount;
     }
 
-    /* Named apart from the per-page getVendorId() helpers elsewhere in the panel:
-     * those are page-local function declarations, and a second one of the same
-     * name would shadow whichever loaded last. Returns the whole record, since
-     * the plan screens need the store's region and section as well as its id. */
+    /* Delegates to resolveCurrentStore() in layouts/app.blade.php - the one place
+     * that knows which store the panel is working on. Returns the whole record,
+     * since the plan screens need the store's region and section as well. */
     async function loadVendorRecord() {
-        var snapshots = authRole === 'vendor' ?
-            await database.collection('vendors').where('author', '==', vendorUserId).get() :
-            await database.collection('vendors').where('id', '==', empVendorId).get();
-
-        if (snapshots.empty) {
-            return null;
-        }
-
-        return snapshots.docs[0].data();
+        return await resolveCurrentStore(vendorUserId);
     }
 
     /* An employee reaches these screens only if their role allows it. The menu

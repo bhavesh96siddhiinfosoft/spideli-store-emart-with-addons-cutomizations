@@ -521,6 +521,147 @@
         <script src="{{ asset('js/chosen.jquery.js') }}"></script>
         <script src="{{ asset('js/bootstrap-tagsinput.js') }}"></script>
 
+        {{-- Defined BEFORE @yield('scripts'): page scripts call these while they
+             run, and anything declared after the yield does not exist yet. --}}
+        <script type="text/javascript">
+
+            /* The store the panel is currently working on.
+             *
+             * An owner is reached through `vendors.author`; an employee through
+             * the single store named on their own user document. Until #3 lands
+             * an owner has exactly one store, so the first result is the only
+             * result - once an owner may have several, this is the one place
+             * that has to learn which of them is selected.
+             *
+             * It replaced twenty page-local copies of the same lookup, several
+             * of which threw when a store record was missing and one of which
+             * returned nothing at all for employees.
+             *
+             * The firestore handle is taken per call rather than held in a
+             * variable, so this block does not care whether firebase has been
+             * initialised at the moment it is parsed. */
+            async function resolveCurrentStore(ownerUserId) {
+                const role = "{{ $authRole }}";
+                const employeeStoreId = "{{ $empVendorId }}";
+
+                try {
+                    const db = firebase.firestore();
+                    let snapshots;
+
+                    if (role === 'vendor') {
+                        if (!ownerUserId) {
+                            return null;
+                        }
+                        snapshots = await db.collection('vendors')
+                            .where('author', '==', ownerUserId).get();
+                    } else {
+                        if (!employeeStoreId) {
+                            return null;
+                        }
+                        snapshots = await db.collection('vendors')
+                            .where('id', '==', employeeStoreId).get();
+                    }
+
+                    if (snapshots.empty) {
+                        return null;
+                    }
+
+                    return snapshots.docs[0].data();
+
+                } catch (err) {
+                    console.error("Error resolving the current store:", err);
+                    return null;
+                }
+            }
+
+            /* The currency this panel should display prices in.
+             *
+             * A store belongs to a region, and a region names its own currency,
+             * so a Cameroon store must read in FCFA even when the globally
+             * active currency is something else. Falls back to the global
+             * currency when the store has no region, or its region names no
+             * currency.
+             *
+             * Shaped like a Firestore query on purpose - `.limit()`,
+             * `.orderBy()` and a `.get()` yielding `{ docs: [ { data() } ] }` -
+             * so a screen only swaps the query expression and keeps its own
+             * logic untouched. Mirrors regionCurrencyRef() in the admin panel.
+             */
+            var storeCurrencyCache = {};
+
+            async function getStoreCurrency() {
+                const ownerUserId = "{{ $vendorUserId ?? '' }}";
+
+                if (storeCurrencyCache.resolved !== undefined) {
+                    return storeCurrencyCache.resolved;
+                }
+
+                const db = firebase.firestore();
+                let currency = null;
+
+                try {
+                    const store = await resolveCurrentStore(ownerUserId);
+
+                    if (store && store.regionId) {
+                        const regionSnapshot = await db.collection('regions').doc(store.regionId).get();
+                        const region = regionSnapshot.exists ? regionSnapshot.data() : null;
+
+                        if (region && region.currencyId) {
+                            const snapshot = await db.collection('currencies').doc(region.currencyId).get();
+                            if (snapshot.exists) {
+                                currency = snapshot.data();
+                            }
+                        }
+                    }
+
+                    if (currency == null) {
+                        const fallback = await db.collection('currencies').where('isActive', '==', true).get();
+                        if (fallback.docs.length > 0) {
+                            currency = fallback.docs[0].data();
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error resolving the store currency:", err);
+                }
+
+                storeCurrencyCache.resolved = currency;
+
+                return currency;
+            }
+
+            function storeCurrencyRef() {
+                return {
+                    limit: function () { return this; },
+                    orderBy: function () { return this; },
+                    where: function () { return this; },
+                    get: async function () {
+                        const currency = await getStoreCurrency();
+
+                        if (!currency) {
+                            return { docs: [], empty: true, size: 0 };
+                        }
+
+                        return {
+                            docs: [{
+                                id: currency.id,
+                                data: function () { return currency; }
+                            }],
+                            empty: false,
+                            size: 1
+                        };
+                    }
+                };
+            }
+
+            /* The id alone, for the many screens that only need it to filter by. */
+            async function resolveCurrentStoreId(ownerUserId) {
+                const store = await resolveCurrentStore(ownerUserId);
+
+                return (store && store.id) ? store.id : '';
+            }
+
+        </script>
+
         @yield('scripts')
 
         <script type="text/javascript">

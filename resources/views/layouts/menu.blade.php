@@ -81,8 +81,8 @@
             if ((isStoreDocumentVerify == true && allApproved == true && isStoreVerification == true) || (isStoreVerification == true && isAutoVerify == true) || (isStoreVerification == false)) {
                 if(authRole === 'vendor'){
                     var newLi = `
-                    <li class="{{ request()->routeIs('store') ? 'active' : '' }}">
-                        <a class="waves-effect waves-dark" href="{!! route('store') !!}" aria-expanded="false">
+                    <li class="{{ request()->routeIs('stores') || request()->routeIs('stores.*') ? 'active' : '' }}">
+                        <a class="waves-effect waves-dark" href="{!! route('stores') !!}" aria-expanded="false">
                             <i class="mdi mdi-store"></i>
                             <span class="hide-menu">{{ trans('lang.mystore_plural') }}</span>
                         </a>

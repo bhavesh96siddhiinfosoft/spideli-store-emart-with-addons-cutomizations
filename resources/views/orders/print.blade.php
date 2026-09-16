@@ -201,7 +201,7 @@
         var ref = database.collection('vendor_orders').where("id", "==", id);
         var currentCurrency = '';
         var currencyAtRight = false;
-        var refCurrency = database.collection('currencies').where('isActive', '==', true);
+        var refCurrency = storeCurrencyRef();
         var decimal_degits = 0;
         var currencyData = '';
         var total_tax_amount = 0;

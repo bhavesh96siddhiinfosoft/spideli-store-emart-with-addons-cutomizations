@@ -266,7 +266,7 @@
     var placeholder = database.collection('settings').doc('placeHolderImage');
    
     var DeliveryCharge = database.collection('settings').doc('DeliveryCharge');    
-    var refCurrency = database.collection('currencies').where('isActive', '==', true);    
+    var refCurrency = storeCurrencyRef();    
 
     let taxesByScope = {};
     var taxScope = '';

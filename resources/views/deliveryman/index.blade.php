@@ -314,21 +314,10 @@
             });
         }
 
+        /* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+         * place that knows which store the panel is working on. */
         async function getVendorId(vendorUser) {
-            var vendorId = '';
-            var ref;
-            if(authRole == 'vendor'){
-                await database.collection('vendors').where('author', "==", vendorUser).get().then(async function(vendorSnapshots) {
-                    var vendorData = vendorSnapshots.docs[0].data();
-                    vendorId = vendorData.id;
-                });
-            }else{
-                await database.collection('vendors').where('id', "==", empVendorId).get().then(async function(vendorSnapshots) {
-                    var vendorData = vendorSnapshots.docs[0].data();
-                    vendorId = vendorData.id;
-                });
-            }
-            return vendorId;
+            return await resolveCurrentStoreId(vendorUser);
         }
         $(document).on("click", "input[name='isActive']", function(e) {
             var ischeck = $(this).is(':checked');

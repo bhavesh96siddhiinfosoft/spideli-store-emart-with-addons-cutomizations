@@ -335,15 +335,10 @@ $(document).on("click","a[name='item-review-delete']", function (e) {
 
 });
 
-async function getVendorId(vendorUser){
-    var vendorId = '';
-    var ref;
-    await database.collection('vendors').where('author',"==",vendorUser).get().then(async function(vendorSnapshots){
-        var vendorData = vendorSnapshots.docs[0].data();    
-        vendorId = vendorData.id;
-    })
-    
-            return vendorId;
+/* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+ * place that knows which store the panel is working on. */
+async function getVendorId(vendorUser) {
+    return await resolveCurrentStoreId(vendorUser);
 }
 
 

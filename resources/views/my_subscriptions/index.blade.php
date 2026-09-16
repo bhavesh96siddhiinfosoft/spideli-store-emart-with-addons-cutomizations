@@ -80,7 +80,7 @@
         var currencyAtRight = false;
         var decimal_degits = 0;
         var activePlan='';
-        var refCurrency = database.collection('currencies').where('isActive', '==', true);
+        var refCurrency = storeCurrencyRef();
         refCurrency.get().then(async function(snapshots) {
             var currencyData = snapshots.docs[0].data();
             currentCurrency = currencyData.symbol;

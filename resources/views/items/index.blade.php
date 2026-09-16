@@ -126,7 +126,7 @@
         var ref;
         var append_list = '';
         var placeholderImage = '';
-        var activeCurrencyref = database.collection('currencies').where('isActive', "==", true);
+        var activeCurrencyref = storeCurrencyRef();
         var activeCurrency = '';
         var currencyAtRight = false;
         var decimal_degits = 0;
@@ -609,38 +609,10 @@
             window.location = "{{ !url()->current() }}";
         });
 
+        /* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+         * place that knows which store the panel is working on. */
         async function getVendorId(vendorUser) {
-            var vendorId = '';
-            var ref;
-            let vendorSnapshots;
-            if (authRole === 'vendor') {
-                vendorSnapshots = await database.collection('vendors').where('author', '==', vendorUser).get();
-            } else {
-                vendorSnapshots = await database.collection('vendors').where('id', '==', empVendorId).get();
-            }
-            if (vendorSnapshots.empty) {
-                console.error('Vendor not found');
-                return '';
-            }
-           
-                var vendorData = vendorSnapshots.docs[0].data();
-                vendorId = vendorData.id;
-                vendorLatitude = vendorData.latitude;
-                vendorLongitude = vendorData.longitude;
-                if (subscriptionModel || commissionModel) {
-                    if (vendorData.hasOwnProperty('subscription_plan') && vendorData.subscription_plan != null && vendorData.subscription_plan != '') {
-                        itemLimit = vendorData.subscription_plan.itemLimit;
-                        if (itemLimit != '-1') {
-                            $('.food-limit-note').html(
-                                '{{ trans('lang.note') }} : {{ trans('lang.your_item_limit_is') }} ' +
-                                itemLimit + ' {{ trans('lang.so_only_first') }} ' + itemLimit +
-                                ' {{ trans('lang.items_will_visible_to_customer') }}')
-                        }
-                    }
-                }
-           
-
-            return vendorId;
+            return await resolveCurrentStoreId(vendorUser);
         }
         $("#deleteAll").click(function() {
             if ($('#itemTable .is_open:checked').length) {

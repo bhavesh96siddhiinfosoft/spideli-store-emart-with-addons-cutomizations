@@ -673,7 +673,7 @@ return [
     'your_item_limit_is'=>'Your item limit is',
     'so_only_first'=>'so only first',
     'items_will_visible_to_customer'=>'items will be visible to customer',
-    'mystore_plural'=>"My Store",
+    'mystore_plural'=>"My Stores",
     'no_subscription_plan_is_created_contact_to_admin' => 'There is no subscription plan available for this section right now.please contact to admin for more information.',
 
     'advertisement_plural' => 'Advertisements',
@@ -1136,5 +1136,19 @@ return [
     'delete_plan_confirm' => 'Are you sure you want to delete this plan?',
     'vendor_record_not_found' => 'Store record not found',
     'wholesale_from_units' => 'from :count units',
+    'stores_table' => 'Stores List',
+    'stores_table_text' => 'View and manage all of your stores',
+    'store_create' => 'Create a Store',
+    'store_edit' => 'Edit Store',
+    'store_info' => 'Store Info',
+    'store_total' => 'Total Stores',
+    'store_active' => 'Active stores',
+    'store_inactive' => 'Inactive stores',
+    'store_items' => 'Items',
+    'store_orders' => 'Orders',
+    'no_stores_yet' => 'You have no stores yet',
+    'delete_store_confirm' => 'Are you sure you want to delete this store? Its products and orders are not deleted.',
+    'store_new_joined' => 'Newly joined stores',
+    'select_categoty' => 'Select Category',
 ];
 ?>

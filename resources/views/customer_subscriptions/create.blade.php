@@ -159,19 +159,11 @@
         }
     }
 
-    /* Named apart from the per-page getVendorId() helpers elsewhere in the panel,
-     * and returns the whole record - the plan needs the store's region and
-     * section, not only its id. */
+    /* Delegates to resolveCurrentStore() in layouts/app.blade.php - the one place
+     * that knows which store the panel is working on. Returns the whole record,
+     * since the plan screens need the store's region and section as well. */
     async function loadVendorRecord() {
-        var snapshots = authRole === 'vendor' ?
-            await database.collection('vendors').where('author', '==', vendorUserId).get() :
-            await database.collection('vendors').where('id', '==', empVendorId).get();
-
-        if (snapshots.empty) {
-            return null;
-        }
-
-        return snapshots.docs[0].data();
+        return await resolveCurrentStore(vendorUserId);
     }
 
     /* An employee reaches these screens only if their role allows it. The menu

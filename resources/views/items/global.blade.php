@@ -117,7 +117,7 @@
 
     var placeholderImage = '';
     var placeholder = database.collection('settings').doc('placeHolderImage');
-    var refCurrency = database.collection('currencies').where('isActive', '==', true);
+    var refCurrency = storeCurrencyRef();
 
     var subscriptionModel = false;
     var createdItem = 0;

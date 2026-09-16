@@ -285,7 +285,7 @@ element.style {
     var currentCurrency = '';
     var currencyAtRight = false;
     var decimal_degits = 0;
-    var refCurrency = database.collection('currencies').where('isActive', '==', true);
+    var refCurrency = storeCurrencyRef();
     refCurrency.get().then(async function (snapshots) {
         var currencyData = snapshots.docs[0].data();
         currentCurrency = currencyData.symbol;
@@ -441,17 +441,10 @@ element.style {
 	    })
 	})
 
-	async function getVendorId(vendorUser){
-	    var vendorId = '';
-	    var ref;
-	    await db.collection('vendors').where('author',"==",vendorUser).get().then(async function(vendorSnapshots){
-            if(vendorSnapshots.docs.length>0){
-                var vendorData = vendorSnapshots.docs[0].data();
-                vendorId = vendorData.id;
-            }
-	        
-	    })
-	    return vendorId;
+	/* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+	 * place that knows which store the panel is working on. */
+	async function getVendorId(vendorUser) {
+	    return await resolveCurrentStoreId(vendorUser);
 	}
 
     async function getTotalEarnings() {

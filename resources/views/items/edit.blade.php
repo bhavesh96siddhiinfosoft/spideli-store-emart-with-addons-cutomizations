@@ -508,7 +508,7 @@
             allowed_file_size = digitalProductData.fileSize;
             $(".max_file_size").text('{{ trans('lang.item_upload_file_max') }}' + allowed_file_size + 'Mb');
         })
-        var refCurrency = database.collection('currencies').where('isActive', '==', true);
+        var refCurrency = storeCurrencyRef();
         refCurrency.get().then(async function(snapshots) {
             var currencyData = snapshots.docs[0].data();
             currentCurrency = currencyData.symbol;

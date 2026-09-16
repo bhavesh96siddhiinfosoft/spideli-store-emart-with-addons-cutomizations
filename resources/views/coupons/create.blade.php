@@ -312,22 +312,10 @@
     return newPhoto;
   }
 
+  /* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+   * place that knows which store the panel is working on. */
   async function getVendorId(vendorUser) {
-    var vendorID = '';
-    var ref;
-    if (authRole == 'vendor') { 
-      await database.collection('vendors').where('author', "==", vendorUser).get().then(async function (vendorSnapshots) {
-        var vendorData = vendorSnapshots.docs[0].data();
-        vendorID = vendorData.id;
-      })
-  }else{
-      var vendorSnapshots = await database.collection('vendors').where('id', '==', empVendorId).get();
-      if (!vendorSnapshots.empty) {
-        var vendorData = vendorSnapshots.docs[0].data();
-        vendorId = vendorSnapshots.docs[0].id;
-      }
-    }
-    return vendorID;
+      return await resolveCurrentStoreId(vendorUser);
   }
 
 </script>

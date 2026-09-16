@@ -352,7 +352,7 @@
 
     var currentCurrency = '';
     var currencyAtRight = false;
-    var refCurrency = database.collection('currencies').where('isActive', '==', true);
+    var refCurrency = storeCurrencyRef();
     refCurrency.get().then(async function (snapshots) {
         var currencyData = snapshots.docs[0].data();
         currentCurrency = currencyData.symbol;
@@ -667,47 +667,10 @@
     }
 
    
+    /* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+     * place that knows which store the panel is working on. */
     async function getVendorId(vendorUser) {
-        var vendorId = '';
-        var ref;
-
-        let vendorQuery;
-
-        if (authRole === 'vendor') {
-            vendorQuery = database.collection('vendors').where('author', "==", vendorUser);
-        } else {
-            vendorQuery = database.collection('vendors').where('id', "==", empVendorId);
-        }
-
-        await vendorQuery.get().then(async function (vendorSnapshots) {
-
-            if (vendorSnapshots.empty) {
-                console.log("No vendor found");
-                return;
-            }
-
-            var vendorData = vendorSnapshots.docs[0].data();
-            vendorId = vendorData.id;
-
-            var sectionId = vendorData.section_id;
-
-            await database.collection('sections').where('id', '==', sectionId).get()
-                .then(function (sectionSnapshot) {
-
-                    if (!sectionSnapshot.empty) {
-
-                        var section = sectionSnapshot.docs[0].data();
-
-                        if (section.hasOwnProperty('dine_in_active') && section.dine_in_active === true) {
-                            dine_in_active = true;
-                        } else {
-                            dine_in_active = false;
-                        }
-                    }
-                });
-        });
-
-        return vendorId;
+        return await resolveCurrentStoreId(vendorUser);
     }
 
 

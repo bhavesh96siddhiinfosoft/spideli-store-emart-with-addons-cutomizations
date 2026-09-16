@@ -109,7 +109,7 @@
     let currentPermissions = {
         isActive: true   
     };
-    var refCurrency = database.collection('currencies').where('isActive', '==', true);
+    var refCurrency = storeCurrencyRef();
     refCurrency.get().then(async function (snapshots) {
         var currencyData = snapshots.docs[0].data();
         currentCurrency = currencyData.symbol;
@@ -498,22 +498,10 @@
         window.location = "{{! url()->current() }}";
     });
 
+    /* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+     * place that knows which store the panel is working on. */
     async function getVendorId(vendorUser) {
-        var vendorID = '';
-        var ref;
-        if(authRole == 'vendor'){
-            await database.collection('vendors').where('author', "==", vendorUser).get().then(async function (vendorSnapshots) {
-                var vendorData = vendorSnapshots.docs[0].data();
-                vendorID = vendorData.id;
-            })
-        }else{
-            await database.collection('vendors').where('id', "==", empVendorId).get().then(async function(vendorSnapshots) {
-                var vendorData = vendorSnapshots.docs[0].data();
-                vendorID = vendorData.id;
-            });            
-        }
-
-        return vendorID;
+        return await resolveCurrentStoreId(vendorUser);
     }
 
 </script>

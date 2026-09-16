@@ -394,30 +394,11 @@
             });
         }
         
-       async function getVendorId(vendorUser) {            
-            let vendorId = "";
-            try {
-                let query;
-                if (authRole === 'vendor') {
-                    query = database.collection('vendors').where('author', '==', vendorUser);
-                } else {
-                    query = database.collection('vendors').where('id', '==', empVendorId);
-                }
-
-                const snap = await query.limit(1).get();                
-
-                if (!snap.empty) {
-                    vendorId = snap.docs[0].data().id;
-                    console.log("Found vendorId:", vendorId);
-                } else {
-                    console.warn("No vendor found for this user/role");
-                }
-            } catch (e) {
-                console.error("getVendorId error:", e);
-            }
-
-            return vendorId;
-        }
+       /* Delegates to resolveCurrentStoreId() in layouts/app.blade.php - the one
+        * place that knows which store the panel is working on. */
+       async function getVendorId(vendorUser) {
+           return await resolveCurrentStoreId(vendorUser);
+       }
         $(document).on("click", "input[name='isActive']", function(e) {
             var ischeck = $(this).is(':checked');
             var id = this.id;
