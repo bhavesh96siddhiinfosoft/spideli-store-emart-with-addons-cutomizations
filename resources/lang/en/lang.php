@@ -1078,7 +1078,7 @@ return [
     'select_region' => 'Select Region',
     'region_help' => 'Select the region your store operates in.',
     'select_region_error' => 'Please select a region',
-    'region_readonly_help' => 'Your store region. Change it on the My Store screen.',
+    'region_readonly_help' => 'The region of the store you are working on. A store region is set on its own edit screen, and your stores may be in different regions.',
     'wholesale_pricing' => 'Wholesale Pricing',
     'offer_at_wholesale' => 'Offer this product at a wholesale price',
     'offer_at_wholesale_help' => 'Customers buying the minimum quantity or more pay the wholesale price per unit.',
@@ -1150,5 +1150,13 @@ return [
     'delete_store_confirm' => 'Are you sure you want to delete this store? Its products and orders are not deleted.',
     'store_new_joined' => 'Newly joined stores',
     'select_categoty' => 'Select Category',
+    'store_select' => 'Use this store',
+    'store_active_now' => 'Active',
+    'store_switched' => 'The panel is now working on this store.',
+    'store_current' => 'current store',
+    'store_status' => 'Status',
+    'store_open' => 'Active',
+    'store_closed' => 'Inactive',
+    'select_region_filter' => 'Select Region',
 ];
 ?>

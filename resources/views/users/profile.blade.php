@@ -67,7 +67,7 @@
                                         </div>
                                     </div>
                                     <div class="form-group row width-50">
-                                        <label class="col-3 control-label">{{ trans('lang.region') }}</label>
+                                        <label class="col-3 control-label">{{ trans('lang.region') }}<br><small class="text-muted">{{ trans('lang.store_current') }}</small></label>
                                         <div class="col-7">
                                             <h5 class="control-label text-primary user_region"></h5>
                                             <div class="form-text text-muted">

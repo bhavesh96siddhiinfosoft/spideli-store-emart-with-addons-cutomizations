@@ -1,5 +1,37 @@
 @extends('layouts.app')
 @section('content')
+    {{-- Kept in the view because the layout's @yield('style') is commented out.
+         `.store-filter` is the positioned ancestor the dropdown is anchored to -
+         see `dropdownParent` below - which is what stops it drifting over the
+         header. `.select-box` in style.css sets the container to position:static,
+         so without this the dropdown would resolve against the page instead. --}}
+    <style>
+        .store-filter {
+            position: relative;
+        }
+
+        .store-filter .select2-container--open {
+            z-index: 1056;
+        }
+
+        .store-filter .select2-dropdown {
+            border: 1px solid #E5E7EB;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 6px 18px rgba(12, 17, 28, 0.08);
+        }
+
+        .store-filter .select2-results__options {
+            max-height: 240px;
+        }
+
+        .store-filter .select2-results__option {
+            padding: 8px 18px;
+            font-size: 14px;
+            color: #6B7280;
+        }
+    </style>
+
     <div class="page-wrapper">
         <div class="row page-titles">
             <div class="col-md-5 align-self-center">
@@ -28,7 +60,12 @@
                                 <span class="counter ml-3 total_count"></span>
                             </div>
                             <div class="d-flex top-title-right align-self-center">
-                                <div class="select-box pl-3">
+                                <div class="select-box pl-3 store-filter" id="region_filter_box">
+                                    <select class="form-control region_selector filteredRecords">
+                                        <option value="" disabled selected>{{ trans('lang.select_region_filter') }}</option>
+                                    </select>
+                                </div>
+                                <div class="select-box pl-3 store-filter" id="category_filter_box">
                                     <select class="form-control cuisine_selector filteredRecords">
                                         <option value="" disabled selected>{{ trans('lang.select_categoty') }}</option>
                                     </select>
@@ -115,6 +152,8 @@
                                                 <th class="delete-all"><input type="checkbox" id="is_active"><label class="col-3 control-label" for="is_active"><a id="deleteAll" class="do_not_delete" href="javascript:void(0)"><i class="mdi mdi-delete"></i> {{ trans('lang.all') }}</a></label></th>
                                                 <th>{{ trans('lang.actions') }}</th>
                                                 <th>{{ trans('lang.store_info') }}</th>
+                                                <th>{{ trans('lang.region') }}</th>
+                                                <th>{{ trans('lang.store_status') }}</th>
                                                 <th>{{ trans('lang.vendor_phone') }}</th>
                                                 <th>{{ trans('lang.date') }}</th>
                                                 <th>{{ trans('lang.store_items') }}</th>
@@ -144,6 +183,9 @@
     var placeholderImage = '';
     var categoriesById = {};
     var selectedCategory = '';
+    var selectedStoreId = '';
+    var selectedRegion = '';
+    var regionNames = {};
 
     /* Only this account's stores. A vendor's stores are `vendors` documents
      * sharing an `author`, so the list is derived rather than stored - see
@@ -153,6 +195,8 @@
     /* Columns the export writes, in table order. */
     var fieldConfig = [
         { title: "{{ trans('lang.store_info') }}", key: 'title' },
+        { title: "{{ trans('lang.region') }}", key: 'exportRegion' },
+        { title: "{{ trans('lang.store_status') }}", key: 'exportStatus' },
         { title: "{{ trans('lang.vendor_phone') }}", key: 'exportPhone' },
         { title: "{{ trans('lang.date') }}", key: 'exportDate' },
         { title: "{{ trans('lang.store_items') }}", key: 'items' },
@@ -162,17 +206,60 @@
     $(document).ready(function () {
         jQuery("#data-table_processing").show();
 
+        loadSelectedStore();
         loadPlaceholder();
         loadCategories();
+        loadRegions();
+
+        /* A fixed width rather than 'resolve' or '100%'. Left to itself select2
+         * measures the plain `.form-control`, which is 100% of a header that is
+         * most of the page wide - the pill stayed at its 150px min-width while
+         * the panel below it inherited the full measurement, so it hung off the
+         * right edge and pushed the page scrollbar out. One width keeps the
+         * pill, the panel and the options in line. */
+        var filterWidth = '190px';
+
+        /* `dropdownParent` anchors the panel to the pill's own wrapper. Left on
+         * its default select2 hangs it off <body> and places it by measuring the
+         * pill once, so it stayed where it was drawn while the page scrolled -
+         * that is what put it over the header. Inside the wrapper it is laid out
+         * with the pill and moves with it. */
+        $('.region_selector').select2({
+            placeholder: "{{ trans('lang.select_region_filter') }}",
+            dropdownParent: $('#region_filter_box'),
+            minimumResultsForSearch: Infinity,
+            allowClear: true,
+            width: filterWidth
+        });
 
         $('.cuisine_selector').select2({
             placeholder: "{{ trans('lang.select_categoty') }}",
+            dropdownParent: $('#category_filter_box'),
+            minimumResultsForSearch: Infinity,
             allowClear: true,
-            width: '100%'
+            width: filterWidth
+        });
+
+        /* Clearing a filter otherwise reopens the dropdown it just cleared. */
+        $('.region_selector, .cuisine_selector').on('select2:unselecting', function () {
+            var self = $(this);
+            setTimeout(function () {
+                self.select2('close');
+            }, 0);
         });
 
         buildTable();
     });
+
+    /* Which store the panel is currently working on, so the list can mark it and
+     * offer the others. */
+    async function loadSelectedStore() {
+        var snapshot = await database.collection('users').doc(vendorUserId).get();
+
+        if (snapshot.exists) {
+            selectedStoreId = snapshot.data().vendorID || '';
+        }
+    }
 
     async function loadPlaceholder() {
         var snapshot = await database.collection('settings').doc('placeHolderImage').get();
@@ -181,37 +268,56 @@
         }
     }
 
-    /* The filter offers only the categories this account's stores actually use,
-     * rather than every category on the platform - with a handful of stores a
-     * full list would be mostly dead options. */
+    /* Every published category, not only those already in use - a vendor
+     * filtering their stores may well be looking for one that has none yet. */
     async function loadCategories() {
         var snapshots = await database.collection('vendor_categories').where('publish', '==', true).get();
+
+        var categories = [];
 
         snapshots.docs.forEach(function (doc) {
             var category = doc.data();
             categoriesById[category.id] = category.title;
+            categories.push(category);
         });
 
-        var stores = await ref.get();
-        var used = [];
-
-        stores.docs.forEach(function (doc) {
-            var ids = doc.data().categoryID || [];
-            ids.forEach(function (id) {
-                if (used.indexOf(id) === -1 && categoriesById[id]) {
-                    used.push(id);
-                }
-            });
+        categories.sort(function (a, b) {
+            return (a.title || '').localeCompare(b.title || '');
         });
 
-        used.sort(function (a, b) {
-            return (categoriesById[a] || '').localeCompare(categoriesById[b] || '');
-        });
-
-        used.forEach(function (id) {
-            $('.cuisine_selector').append($("<option></option>").attr("value", id).text(categoriesById[id]));
+        categories.forEach(function (category) {
+            $('.cuisine_selector').append($("<option></option>").attr("value", category.id).text(category.title));
         });
     }
+
+    /* Every published region, for the same reason as the categories above. */
+    async function loadRegions() {
+        var snapshots = await database.collection('regions').get();
+
+        var regions = [];
+
+        snapshots.docs.forEach(function (doc) {
+            var region = doc.data();
+            if (region.publish !== true) {
+                return;
+            }
+            regionNames[region.id] = region.name;
+            regions.push(region);
+        });
+
+        regions.sort(function (a, b) {
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        regions.forEach(function (region) {
+            $('.region_selector').append($("<option></option>").attr("value", region.id).text(region.name));
+        });
+    }
+
+    $(document).on('change', '.region_selector', function () {
+        selectedRegion = $(this).val() || '';
+        $('#storeTable').DataTable().ajax.reload();
+    });
 
     $(document).on('change', '.cuisine_selector', function () {
         selectedCategory = $(this).val() || '';
@@ -230,7 +336,7 @@
                 const searchValue = data.search.value.toLowerCase();
                 const orderColumnIndex = data.order.length ? data.order[0].column : 4;
                 const orderDirection = data.order.length ? data.order[0].dir : 'desc';
-                const orderableColumns = ['', '', 'title', 'phonenumber', 'createdAt', 'items', 'orders'];
+                const orderableColumns = ['', '', 'title', 'regionId', 'isActive', 'phonenumber', 'createdAt', 'items', 'orders'];
                 const orderByField = orderableColumns[orderColumnIndex];
 
                 if (searchValue.length >= 3 || searchValue.length === 0) {
@@ -248,10 +354,6 @@
                         return;
                     }
 
-                    /* The owner's own active flag decides whether their stores are
-                     * live - a store has no separate switch of its own. */
-                    const ownerActive = await isOwnerActive();
-
                     let filteredRecords = [];
 
                     await Promise.all(querySnapshot.docs.map(async function (doc) {
@@ -264,6 +366,13 @@
                         childData.items = await countIn('vendor_products', childData.id);
                         childData.orders = await countIn('vendor_orders', childData.id);
                         childData.exportDate = formatDate(childData.createdAt);
+                        childData.exportRegion = regionNames[childData.regionId] || '';
+                        childData.exportStatus = (childData.isActive === false)
+                            ? "{{ trans('lang.store_closed') }}" : "{{ trans('lang.store_open') }}";
+
+                        if (selectedRegion !== '' && childData.regionId !== selectedRegion) {
+                            return;
+                        }
 
                         if (selectedCategory !== '') {
                             const ids = childData.categoryID || [];
@@ -321,8 +430,12 @@
 
                     $('.total_count').text(totalRecords);
                     $('.rest_count').text(totalRecords);
-                    $('.rest_active_count').text(ownerActive ? totalRecords : 0);
-                    $('.rest_inactive_count').text(ownerActive ? 0 : totalRecords);
+                    var activeCount = filteredRecords.filter(function (r) {
+                        return r.isActive !== false;
+                    }).length;
+
+                    $('.rest_active_count').text(activeCount);
+                    $('.rest_inactive_count').text(totalRecords - activeCount);
                     $('.new_joined_rest').text(newJoined);
 
                     const paginatedRecords = filteredRecords.slice(start, start + length);
@@ -344,7 +457,7 @@
                     callback({ draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: [] });
                 }
             },
-            order: [[4, 'desc']],
+            order: [[6, 'desc']],
             columnDefs: [
                 { orderable: false, targets: [0, 1] }
             ],
@@ -401,6 +514,15 @@
             '<label class="col-3 control-label" for="is_open_' + id + '"></label></span>');
 
         var actionHtml = '<span class="action-btn">';
+
+        /* The store the panel is already on cannot be switched to again, so it
+         * shows a marker instead of the action. */
+        if (id === selectedStoreId) {
+            actionHtml += '<a href="javascript:void(0)" class="do_not_delete" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.store_active_now') }}"><i class="mdi mdi-check-circle text-success"></i></a>';
+        } else {
+            actionHtml += '<a href="javascript:void(0)" name="select-btn" class="do_not_delete" dataId="' + id + '" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.store_select') }}"><i class="mdi mdi-store"></i></a>';
+        }
+
         actionHtml += '<a href="' + routeView + '" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.view') }}"><i class="mdi mdi-eye"></i></a>';
         actionHtml += '<a href="' + routeEdit + '" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.edit') }}"><i class="mdi mdi-lead-pencil"></i></a>';
         actionHtml += '<a id="' + id + '" name="delete-btn" class="do_not_delete" href="javascript:void(0)" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.delete') }}"><i class="mdi mdi-delete"></i></a>';
@@ -411,6 +533,15 @@
         html.push('<img alt="" width="100%" style="width:70px;height:70px;" src="' + photo +
             '" onerror="this.onerror=null;this.src=\'' + placeholderImage + '\'" alt="image">' +
             '<a href="' + routeView + '" class="redirecttopage left_space">' + (val.title || '') + '</a>');
+
+        html.push(regionNames[val.regionId] ? regionNames[val.regionId] : '');
+
+        /* The store's own open/closed switch, not the account's approval - the
+         * owner's approval applies to all their stores equally, so it would say
+         * the same thing on every row. */
+        html.push(val.isActive === false
+            ? '<span class="badge badge-danger">{{ trans('lang.store_closed') }}</span>'
+            : '<span class="badge badge-success">{{ trans('lang.store_open') }}</span>');
 
         html.push(val.phonenumber || '');
 
@@ -437,11 +568,21 @@
         return snapshots.size;
     }
 
-    async function isOwnerActive() {
-        var snapshot = await database.collection('users').doc(vendorUserId).get();
+    /* Switching store repoints the whole panel - Items, Orders, Point Of Sale and
+     * the rest all read the selected store - so the page is reloaded rather than
+     * patched. */
+    $(document).on('click', '[name="select-btn"]', async function () {
+        jQuery("#data-table_processing").show();
 
-        return snapshot.exists ? snapshot.data().active !== false : true;
-    }
+        var switched = await selectStore(vendorUserId, $(this).attr('dataId'));
+
+        if (!switched) {
+            jQuery("#data-table_processing").hide();
+            return;
+        }
+
+        window.location.reload();
+    });
 
     /* Deleting a store leaves its products and orders in place - they are history,
      * and an order that lost its store would be unreadable in the admin panel. */

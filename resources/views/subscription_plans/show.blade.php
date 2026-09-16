@@ -442,9 +442,18 @@
                                                     ? userData.isAutoVerify 
                                                     : false;                                                
 
-                                                if (userData.hasOwnProperty('subscriptionPlanId') &&
-                                                    userData.subscriptionPlanId != '' && userData
-                                                    .subscriptionPlanId != null) {
+                                                /* A subscription belongs to the store, not the
+                                                 * account - a vendor with two stores subscribes
+                                                 * each one separately. The vendors document has
+                                                 * carried these fields all along; the check used
+                                                 * to read the owner's copy, which meant one
+                                                 * subscribed store made every store look
+                                                 * subscribed. */
+                                                var selectedStore = await resolveCurrentStore(userId);
+                                                var storeSubscriptionId = (selectedStore && selectedStore.subscriptionPlanId)
+                                                    ? selectedStore.subscriptionPlanId : '';
+
+                                                if (storeSubscriptionId != '' && storeSubscriptionId != null) {
                                                     if (documentVerificationEnable && (!isDocumentVerified || userData.isDocumentVerify)) {                                                        
                                                         window.location = "{{ route('vendors.document') }}";
                                                     } else if(documentVerificationEnable && isAutoVerified){

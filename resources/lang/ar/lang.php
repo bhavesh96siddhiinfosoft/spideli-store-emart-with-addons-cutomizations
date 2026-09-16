@@ -1071,7 +1071,7 @@ return [
     'select_region' => 'اختر المنطقة',
     'region_help' => 'اختر المنطقة التي يعمل بها متجرك.',
     'select_region_error' => 'الرجاء اختيار منطقة',
-    'region_readonly_help' => 'منطقة متجرك. يمكنك تغييرها من شاشة متجري.',
+    'region_readonly_help' => 'منطقة المتجر الذي تعمل عليه. تُحدَّد منطقة كل متجر من شاشة تعديله، وقد تكون متاجرك في مناطق مختلفة.',
     'wholesale_pricing' => 'أسعار الجملة',
     'offer_at_wholesale' => 'عرض هذا المنتج بسعر الجملة',
     'offer_at_wholesale_help' => 'العملاء الذين يشترون الحد الأدنى للكمية أو أكثر يدفعون سعر الجملة لكل وحدة.',
@@ -1143,5 +1143,13 @@ return [
     'delete_store_confirm' => 'هل أنت متأكد من حذف هذا المتجر؟ لن يتم حذف منتجاته وطلباته.',
     'store_new_joined' => 'متاجر انضمت حديثًا',
     'select_categoty' => 'اختر الفئة',
+    'store_select' => 'استخدم هذا المتجر',
+    'store_active_now' => 'نشط',
+    'store_switched' => 'اللوحة تعمل الآن على هذا المتجر.',
+    'store_current' => 'المتجر الحالي',
+    'store_status' => 'الحالة',
+    'store_open' => 'نشط',
+    'store_closed' => 'غير نشط',
+    'select_region_filter' => 'اختر المنطقة',
 ];
 ?>

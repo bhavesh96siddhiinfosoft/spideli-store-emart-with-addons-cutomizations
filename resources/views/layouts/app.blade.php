@@ -546,32 +546,91 @@
 
                 try {
                     const db = firebase.firestore();
-                    let snapshots;
 
-                    if (role === 'vendor') {
-                        if (!ownerUserId) {
-                            return null;
-                        }
-                        snapshots = await db.collection('vendors')
-                            .where('author', '==', ownerUserId).get();
-                    } else {
+                    /* An employee belongs to one store and never chooses. */
+                    if (role !== 'vendor') {
                         if (!employeeStoreId) {
                             return null;
                         }
-                        snapshots = await db.collection('vendors')
+                        const owned = await db.collection('vendors')
                             .where('id', '==', employeeStoreId).get();
+
+                        return owned.empty ? null : owned.docs[0].data();
                     }
 
-                    if (snapshots.empty) {
+                    if (!ownerUserId) {
                         return null;
                     }
 
-                    return snapshots.docs[0].data();
+                    /* Every store on this account. Derived from `author` rather
+                     * than stored, so it cannot drift. */
+                    const stores = await db.collection('vendors')
+                        .where('author', '==', ownerUserId).get();
+
+                    if (stores.empty) {
+                        return null;
+                    }
+
+                    /* users.vendorID names the store the owner has selected.
+                     * It is honoured only when it still belongs to them - a
+                     * store that was deleted, or an id left over from before,
+                     * must not strand the panel on nothing. */
+                    const userSnapshot = await db.collection('users').doc(ownerUserId).get();
+                    const selectedId = userSnapshot.exists ? (userSnapshot.data().vendorID || '') : '';
+
+                    if (selectedId) {
+                        const match = stores.docs.find(function (doc) {
+                            const store = doc.data();
+                            return (store.id || doc.id) === selectedId;
+                        });
+
+                        if (match) {
+                            return match.data();
+                        }
+                    }
+
+                    /* No usable selection: fall back to the first store and
+                     * record it, so the panel settles somewhere stable instead
+                     * of picking again on every page. */
+                    const first = stores.docs[0].data();
+                    const firstId = first.id || stores.docs[0].id;
+
+                    if (selectedId !== firstId) {
+                        try {
+                            await db.collection('users').doc(ownerUserId).update({ 'vendorID': firstId });
+                        } catch (err) {
+                            console.error("Could not record the selected store:", err);
+                        }
+                    }
+
+                    return first;
 
                 } catch (err) {
                     console.error("Error resolving the current store:", err);
                     return null;
                 }
+            }
+
+            /* Switches the panel to another of this account's stores. Writes the
+             * selection and reloads - every screen reads the selected store, so
+             * the whole panel follows. */
+            async function selectStore(ownerUserId, storeId) {
+                const db = firebase.firestore();
+
+                const stores = await db.collection('vendors')
+                    .where('author', '==', ownerUserId).get();
+
+                const owns = stores.docs.some(function (doc) {
+                    return (doc.data().id || doc.id) === storeId;
+                });
+
+                if (!owns) {
+                    return false;
+                }
+
+                await db.collection('users').doc(ownerUserId).update({ 'vendorID': storeId });
+
+                return true;
             }
 
             /* The currency this panel should display prices in.
