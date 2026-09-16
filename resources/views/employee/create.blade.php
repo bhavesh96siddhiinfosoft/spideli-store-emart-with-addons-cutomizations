@@ -35,8 +35,17 @@
                                 <fieldset>
                                     <legend>{{ trans('lang.basic_details') }}</legend>
                                     <div class="form-group row width-50">
-                                        <label class="col-3 control-label">{{trans('lang.employee_role')}}</label>
-                                        <div class="col-7">
+                                        <label class="col-3 control-label required-field">{{trans('lang.employee_store')}}</label>
+                                        <div class="col-7 custom-dropdown">
+                                            <select class="form-control" id="employee_store" required>
+                                                <option value="">{{trans('lang.select_store_filter')}}</option>
+                                            </select>
+                                            <div class="form-text text-muted">{{trans('lang.employee_store_help')}}</div>
+                                        </div>
+                                    </div>
+                                    <div class="form-group row width-50">
+                                        <label class="col-3 control-label required-field">{{trans('lang.employee_role')}}</label>
+                                        <div class="col-7 custom-dropdown">
                                             <select class="form-control" id="employee_role" required>
                                                 <option value="">{{trans('lang.select_role')}}</option>
                                             </select>
@@ -162,40 +171,82 @@
             var placeholderImageData = snapshotsimage.data();
             placeholderImage = placeholderImageData.image;
         })      
-        let vendorQuery = database.collection('vendors');
+        /* An employee belongs to one store, and the owner says which. The store
+         * used to be whichever `vendors` document came back first, which on an
+         * account with more than one was arbitrary. */
+        var storesById = {};
 
-        if (authRole === 'employee') {           
-            vendorQuery = vendorQuery.where('id', '==', empVendorId);
-        } else {           
-            vendorQuery = vendorQuery.where('author', '==', vendorUserId);
-        }  
-        vendorQuery.get().then(async function(vendorSnapshots) {
-            if (vendorSnapshots.docs.length > 0) {
-                vendorData = vendorSnapshots.docs[0].data();
-                restaurant_id = vendorData.id;
-                zoneId = vendorData.zoneId;
+        async function loadStores() {
+            let vendorQuery = database.collection('vendors');
 
+            if (authRole === 'employee') {
+                vendorQuery = vendorQuery.where('id', '==', empVendorId);
+            } else {
+                vendorQuery = vendorQuery.where('author', '==', vendorUserId);
+            }
 
-                database.collection('vendor_employee_roles').where('vendorId', '==', restaurant_id).where('isEnable', '==' ,true).get().then(function(roleSnapshot) {
-                    var select = document.getElementById('employee_role');
-                    select.innerHTML = '<option value="">{{trans("lang.select_role")}}</option>'; 
+            var vendorSnapshots = await vendorQuery.get();
+            var stores = [];
 
+            vendorSnapshots.docs.forEach(function(doc) {
+                var store = doc.data();
+                store.id = store.id || doc.id;
+                storesById[store.id] = store;
+                stores.push(store);
+            });
+
+            stores.sort(function(a, b) {
+                return (a.title || '').localeCompare(b.title || '');
+            });
+
+            var select = $('#employee_store');
+
+            stores.forEach(function(store) {
+                select.append($("<option></option>").attr("value", store.id).text(store.title || store.id));
+            });
+
+            /* With one store there is nothing to choose, so it is chosen. */
+            if (stores.length === 1) {
+                select.val(stores[0].id);
+                applyStore(stores[0].id);
+            }
+        }
+
+        /* The role list belongs to the store, so it is rebuilt whenever the store
+         * changes and any role picked for the previous store is dropped. */
+        function applyStore(storeId) {
+            var select = document.getElementById('employee_role');
+            select.innerHTML = '<option value="">{{trans("lang.select_role")}}</option>';
+
+            restaurant_id = storeId || '';
+            zoneId = storesById[restaurant_id] ? storesById[restaurant_id].zoneId : '';
+
+            if (!restaurant_id) {
+                return;
+            }
+
+            database.collection('vendor_employee_roles').where('vendorId', '==', restaurant_id).where('isEnable', '==', true).get()
+                .then(function(roleSnapshot) {
                     if (roleSnapshot.empty) {
-                        console.warn("No roles found for vendor:", restaurant_id);                      
+                        console.warn("No roles found for vendor:", restaurant_id);
                         return;
                     }
 
                     roleSnapshot.forEach(function(doc) {
                         var role = doc.data();
-                        var option = document.createElement('option');                        option.value = doc.id;                  
-                        option.textContent = role.title || "Unnamed Role (" + doc.id + ")";                        
+                        var option = document.createElement('option');
+                        option.value = doc.id;
+                        option.textContent = role.title || "Unnamed Role (" + doc.id + ")";
                         select.appendChild(option);
                     });
                 })
                 .catch(function(err) {
                     console.error("Error loading roles:", err);
                 });
-            }
+        }
+
+        $(document).on('change', '#employee_store', function() {
+            applyStore($(this).val());
         });
         document.addEventListener("DOMContentLoaded", async function() {
             if (authRole === 'employee') {               
@@ -218,6 +269,21 @@
                 allowClear: true
             });
 
+            await loadStores();
+
+            /* `.custom-dropdown` on the wrapper is the theme's own answer to its
+             * base `.select2.select2-container` rule, which is written for the
+             * phone country picker: absolutely positioned, `width: auto
+             * !important` and the text capped at 107px. Without it these two sit
+             * out of the flow, under the help text, reading "Test Stor...". */
+            $("#employee_store").select2({
+                placeholder: "{{trans('lang.select_store_filter')}}"
+            });
+
+            $("#employee_role").select2({
+                placeholder: "{{trans('lang.select_role')}}"
+            });
+
         });
 
         $(".save_from_btn").click(async function() {
@@ -229,7 +295,17 @@
             var countryCode = '+' + $("#country_selector option:selected").attr('phoneCode');
 		    var isoCode = $("#country_selector").val();
             var isActive = $("#is_active").is(':checked') ? true : false;           
+            var selectedStoreId = $("#employee_store").val();
             var selectedRoleId = $("#employee_role").val();
+
+            if (!selectedStoreId) {
+                $(".error_top").show();
+                $(".error_top").html("");
+                $(".error_top").append("<p>{{ trans('lang.please_select_a_store') }}</p>");
+                window.scrollTo(0, 0);
+                return;
+            }
+
             if (!selectedRoleId) {
                 $(".error_top").show();
                 $(".error_top").html("");
@@ -290,10 +366,10 @@
                                 'createdAt': createdAtman,
                                 'provider': "email",
                                 'appIdentifier': "web",
-                                'vendorID': restaurant_id,
+                                'vendorID': selectedStoreId,
                                 'active': isActive,
                                 'isDocumentVerify': true,
-                                'zoneId': zoneId,
+                                'zoneId': storesById[selectedStoreId] ? (storesById[selectedStoreId].zoneId || '') : zoneId,
                                 'isActive': false,
                                 'employeePermissionId': selectedRoleId,
 

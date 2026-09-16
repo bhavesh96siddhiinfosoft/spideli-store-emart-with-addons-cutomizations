@@ -1,37 +1,5 @@
 @extends('layouts.app')
 @section('content')
-    {{-- Kept in the view because the layout's @yield('style') is commented out.
-         `.store-filter` is the positioned ancestor the dropdown is anchored to -
-         see `dropdownParent` below - which is what stops it drifting over the
-         header. `.select-box` in style.css sets the container to position:static,
-         so without this the dropdown would resolve against the page instead. --}}
-    <style>
-        .store-filter {
-            position: relative;
-        }
-
-        .store-filter .select2-container--open {
-            z-index: 1056;
-        }
-
-        .store-filter .select2-dropdown {
-            border: 1px solid #E5E7EB;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 6px 18px rgba(12, 17, 28, 0.08);
-        }
-
-        .store-filter .select2-results__options {
-            max-height: 240px;
-        }
-
-        .store-filter .select2-results__option {
-            padding: 8px 18px;
-            font-size: 14px;
-            color: #6B7280;
-        }
-    </style>
-
     <div class="page-wrapper">
         <div class="row page-titles">
             <div class="col-md-5 align-self-center">
@@ -493,6 +461,12 @@
                     ]
                 }
             ],
+            /* Rows arrive after the page has loaded, and custom.min.js binds
+             * tooltips once on ready - so rows drawn later have none unless they
+             * are bound on each draw. */
+            drawCallback: function () {
+                $('#storeTable [data-toggle="tooltip"]').tooltip();
+            },
             initComplete: function () {
                 $(".dataTables_filter").append($(".dt-buttons").detach());
                 $('.dataTables_filter input').attr('placeholder', '{{ trans("lang.search_here") }}').attr('autocomplete', 'new-password').val('');
@@ -513,19 +487,22 @@
         html.push('<span class="delete-all"><input type="checkbox" id="is_open_' + id + '" class="is_open" dataId="' + id + '">' +
             '<label class="col-3 control-label" for="is_open_' + id + '"></label></span>');
 
+        /* Tooltips read from `title`. Bootstrap 4 is what this panel loads, and it
+         * takes the text from there - `data-bs-original-title` is Bootstrap 5's
+         * name for an attribute it writes itself, so it said nothing here. */
         var actionHtml = '<span class="action-btn">';
 
         /* The store the panel is already on cannot be switched to again, so it
          * shows a marker instead of the action. */
         if (id === selectedStoreId) {
-            actionHtml += '<a href="javascript:void(0)" class="do_not_delete" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.store_active_now') }}"><i class="mdi mdi-check-circle text-success"></i></a>';
+            actionHtml += '<a href="javascript:void(0)" class="do_not_delete" data-toggle="tooltip" title="{{ trans('lang.store_active_now') }}"><i class="mdi mdi-check-circle text-success"></i></a>';
         } else {
-            actionHtml += '<a href="javascript:void(0)" name="select-btn" class="do_not_delete" dataId="' + id + '" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.store_select') }}"><i class="mdi mdi-store"></i></a>';
+            actionHtml += '<a href="javascript:void(0)" name="select-btn" class="do_not_delete" dataId="' + id + '" data-toggle="tooltip" title="{{ trans('lang.store_select') }}"><i class="mdi mdi-store"></i></a>';
         }
 
-        actionHtml += '<a href="' + routeView + '" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.view') }}"><i class="mdi mdi-eye"></i></a>';
-        actionHtml += '<a href="' + routeEdit + '" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.edit') }}"><i class="mdi mdi-lead-pencil"></i></a>';
-        actionHtml += '<a id="' + id + '" name="delete-btn" class="do_not_delete" href="javascript:void(0)" data-toggle="tooltip" data-bs-original-title="{{ trans('lang.delete') }}"><i class="mdi mdi-delete"></i></a>';
+        actionHtml += '<a href="' + routeView + '" data-toggle="tooltip" title="{{ trans('lang.view') }}"><i class="mdi mdi-eye"></i></a>';
+        actionHtml += '<a href="' + routeEdit + '" data-toggle="tooltip" title="{{ trans('lang.edit') }}"><i class="mdi mdi-lead-pencil"></i></a>';
+        actionHtml += '<a id="' + id + '" name="delete-btn" class="do_not_delete" href="javascript:void(0)" data-toggle="tooltip" title="{{ trans('lang.delete') }}"><i class="mdi mdi-delete"></i></a>';
         actionHtml += '</span>';
         html.push(actionHtml);
 

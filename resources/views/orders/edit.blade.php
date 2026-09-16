@@ -1154,21 +1154,14 @@
                                             'subscriptionTotalOrders': subscriptionTotalOrders.toString()
                                         })
                                     }                                    
-                                    if (isNaN(vendordata.wallet_amount) ||
-                                        vendordata.wallet_amount == undefined) {
-                                        vendorWallet = 0;
-                                    } else {
-                                        vendorWallet = parseFloat(vendordata
-                                            .wallet_amount);
-                                    }
-                                    newVendorWallet = vendorWallet + vendorAmount + parseFloat(total_tax_amount);
-                                    database.collection('users').doc(
-                                        vendorAuthor).update({
-                                        'wallet_amount': parseFloat(
-                                            newVendorWallet)
-                                    }).then(async function(result) {
-                                        callAjax(orderStatus);
-                                    })
+                                    /* Credited to the store that took the order -
+                                     * `order.vendor.id`, not whichever store the
+                                     * panel happens to be on - and to the account
+                                     * it belongs to. */
+                                    await applyVendorWalletDelta(vendorId, vendorAuthor,
+                                        vendorAmount + parseFloat(total_tax_amount));
+
+                                    callAjax(orderStatus);
                                 } else {
                                     callAjax(orderStatus);
                                 }
@@ -2163,14 +2156,13 @@
                     if (vendorAmount) {
                         const vendorDoc = await database.collection('users').doc(vendorId).get();
                         if (vendorDoc.exists) {
-                            const vendorData = vendorDoc.data();
-                            vendorFcm = vendorData.fcmToken || '';
-                            const vendorWallet = parseFloat(vendorData.wallet_amount || 0);
-                            const finalvendorWallet = parseFloat((vendorWallet - vendorAmount).toFixed(2));
-                            await vendorDoc.ref.update({
-                                wallet_amount: finalvendorWallet
-                            });
+                            vendorFcm = vendorDoc.data().fcmToken || '';
                         }
+
+                        /* Taken back off the store that was credited for this
+                         * order, and off the account with it. `vendorId` here is
+                         * the owner - the store is on the order. */
+                        await applyVendorWalletDelta(orderData.vendorID, vendorId, -vendorAmount);
                         const walletId = database.collection("tmp").doc().id;
                         await database.collection('wallet').doc(walletId).set({
                             amount: vendorBaseAmount,

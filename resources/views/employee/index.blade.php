@@ -34,14 +34,27 @@
                             </ul>
                         </div>
                         <div class="card-body page">
+                            {{-- The flex classes sit on the inner wrapper, not on the
+                                 element that gets hidden: Bootstrap utilities are
+                                 !important, so `.d-flex` beats an inline display:none
+                                 and .hide() silently does nothing. --}}
+                            <div class="employee-filters mb-3">
+                                <div class="d-flex justify-content-end list-filters">
+                                    <div class="select-box pl-3 store-filter store-filter-wide" id="store_filter_box">
+                                        <select class="form-control store_selector">
+                                            <option value="" disabled selected>{{ trans('lang.select_store_filter') }}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="table-responsive m-t-10">
                                 <table id="employeeTable" class="display nowrap table table-hover table-striped table-bordered table table-striped" cellspacing="0" width="100%">
                                     <thead>
                                         <th class="delete-all"><input type="checkbox" class="checkbox_is_check" id="is_active"><label class="col-3 control-label" for="is_active">
                                             <a id="deleteAll" class="do_not_delete" href="javascript:void(0)"><i class="mdi mdi-delete"></i> {{ trans('lang.all') }}</a></label>
                                         </th>
-                                        <th>{{ trans('lang.image') }}</th>
                                         <th>{{ trans('lang.user_name') }}</th>
+                                        <th>{{ trans('lang.store_info') }}</th>
                                         <th>{{ trans('lang.email') }}</th>
                                         <th>{{ trans('lang.role') }}</th>
                                         <th>{{ trans('lang.active') }}</th>
@@ -105,32 +118,117 @@
         var append_list = '';
         var placeholderImage = '';
         const roleCache = {};
+
+        /* An employee belongs to one store, so this list covers every store on
+         * the account and is narrowed by the two filters. An employee viewing it
+         * sees only their own store and gets no filters. */
+        var storesById = {};
+        var accountStoreIds = [];
+        var selectedStore = '';
+
         ref = database.collection('users').where("role", "==", "employee");
 
-        async function loadAllRoles() {
-        try {
-            const vendorId = await getVendorId(vendorUserId);
-            if (!vendorId) return;
+        /* Firestore takes at most ten values in an `in`, so anything queried by
+         * store id is asked for ten stores at a time and stitched back together. */
+        function chunked(ids) {
+            var chunks = [];
 
-            const roleSnap = await database.collection('vendor_employee_roles')
-                .where('vendorId', '==', vendorId)
-                .get();
+            for (var i = 0; i < ids.length; i += 10) {
+                chunks.push(ids.slice(i, i + 10));
+            }
 
-            roleSnap.forEach(doc => {
-                const data = doc.data();
-                const title = data.title?.trim() || '—';
-                roleCache[doc.id] = title;
+            return chunks;
+        }
+
+        async function loadStores() {
+            var snapshots;
+
+            if (authRole === 'employee') {
+                if (!empVendorId) {
+                    return;
+                }
+                snapshots = await database.collection('vendors').where('id', '==', empVendorId).get();
+            } else {
+                snapshots = await database.collection('vendors').where('author', '==', vendorUserId).get();
+            }
+
+            snapshots.docs.forEach(function(doc) {
+                var store = doc.data();
+                var storeId = store.id || doc.id;
+
+                storesById[storeId] = store;
+                accountStoreIds.push(storeId);
             });
 
-            console.log("Loaded roles:", Object.keys(roleCache).length);
-        } catch (e) {
-            console.error("Failed to load roles:", e);
+            /* What the Create tab checks before letting an employee be added. */
+            vendorId = accountStoreIds.length ? accountStoreIds[0] : '';
         }
-    }
 
-        document.addEventListener("DOMContentLoaded", async function() {      
+        /* Roles belong to a store, so every store on the account contributes. */
+        async function loadAllRoles() {
+            try {
+                if (!accountStoreIds.length) {
+                    return;
+                }
 
+                var snapshots = await Promise.all(chunked(accountStoreIds).map(function(chunk) {
+                    return database.collection('vendor_employee_roles').where('vendorId', 'in', chunk).get();
+                }));
+
+                snapshots.forEach(function(snapshot) {
+                    snapshot.forEach(function(doc) {
+                        var data = doc.data();
+                        roleCache[doc.id] = data.title?.trim() || '—';
+                    });
+                });
+            } catch (e) {
+                console.error("Failed to load roles:", e);
+            }
+        }
+
+        function storeTitle(storeId) {
+            return storesById[storeId] ? (storesById[storeId].title || '') : '';
+        }
+
+        function fillStoreFilter() {
+            var $select = $('.store_selector');
+            var stores = accountStoreIds.slice();
+
+            stores.sort(function(a, b) {
+                return storeTitle(a).localeCompare(storeTitle(b));
+            });
+
+            stores.forEach(function(storeId) {
+                $select.append($("<option></option>").attr("value", storeId).text(storeTitle(storeId)));
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", async function() {
+
+            await loadStores();
             await loadAllRoles();
+
+            /* An employee belongs to one store and has nothing to choose
+             * between. An owner keeps the filter whatever their store count -
+             * it is part of the screen, not something that comes and goes. */
+            if (authRole === 'employee') {
+                $('.employee-filters').hide();
+            } else {
+                fillStoreFilter();
+
+                $('.store_selector').select2({
+                    placeholder: "{{ trans('lang.select_store_filter') }}",
+                    dropdownParent: $('#store_filter_box'),
+                    minimumResultsForSearch: Infinity,
+                    allowClear: true,
+                    width: '240px'
+                });
+            }
+
+            $(document).on('change', '.store_selector', function() {
+                selectedStore = $(this).val() || '';
+                $('#employeeTable').DataTable().ajax.reload();
+            });
 
             if (authRole === 'employee') {               
                 const perm = await getEmployeePermissionForTitle(vendorUserId, "All Employee");
@@ -166,16 +264,32 @@
                     const searchValue = data.search.value.toLowerCase();
                     const orderColumnIndex = data.order[0].column;
                     const orderDirection = data.order[0].dir;
-                    const orderableColumns = ['','', 'driverName', 'email','roleTitle', '', 'createdAt',  ''];
+                    const orderableColumns = ['', 'driverName', 'storeTitle', 'email', 'roleTitle', '', 'createdAt', ''];
                     const orderByField = orderableColumns[orderColumnIndex];
                     if (searchValue.length >= 3 || searchValue.length === 0) {
                         $('#data-table_processing').show();
                     }
                     try {
 
-                        const Vendor = await getVendorId(vendorUserId);
-                        const querySnapshot = await ref.where('vendorID', "==", Vendor).get();
-                        if (!querySnapshot || querySnapshot.empty) {
+                        /* One store when the filter names one, otherwise every
+                         * store on the account. */
+                        var storeIds = selectedStore !== '' ? [selectedStore] : accountStoreIds.slice();
+
+                        var employeeDocs = [];
+
+                        if (storeIds.length) {
+                            var snapshots = await Promise.all(chunked(storeIds).map(function(chunk) {
+                                return ref.where('vendorID', 'in', chunk).get();
+                            }));
+
+                            snapshots.forEach(function(snapshot) {
+                                snapshot.docs.forEach(function(doc) {
+                                    employeeDocs.push(doc);
+                                });
+                            });
+                        }
+
+                        if (!employeeDocs.length) {
                             $('#data-table_processing').hide(); // Hide loader
                             callback({
                                 draw: data.draw,
@@ -187,11 +301,12 @@
                         }
                         let records = [];
                         let filteredRecords = [];
-                        await Promise.all(querySnapshot.docs.map(async (doc) => {
+                        await Promise.all(employeeDocs.map(async (doc) => {
                             let childData = doc.data();
                             childData.id = doc.id;
                             childData.driverName = childData.firstName + ' ' + childData.lastName || " "
                             childData.roleTitle = roleCache[childData.employeePermissionId] || '—';
+                            childData.storeTitle = storeTitle(childData.vendorID);
 
                             const options = {
                                 year: 'numeric',
@@ -213,7 +328,8 @@
                                 if (
                                     (childData.driverName && childData.driverName.toString().toLowerCase().includes(searchValue)) ||
                                     (childData.createdDate && childData.createdDate.toString().toLowerCase().indexOf(searchValue) > -1) ||
-                                    (childData.email && childData.email.toString().includes(searchValue))
+                                    (childData.email && childData.email.toString().includes(searchValue)) ||
+                                    (childData.storeTitle && childData.storeTitle.toString().toLowerCase().includes(searchValue)) ||
                                     (childData.roleTitle && childData.roleTitle.toString().toLowerCase().includes(searchValue))
                                 ) {
                                     filteredRecords.push(childData);
@@ -263,10 +379,16 @@
                 order: [6, 'desc'],
                 columnDefs: [{
                         orderable: false,
-                        targets: [0,1, 4,6]
+                        targets: [0, 4, 6]
                     },
 
                 ],
+                /* Rows arrive after the page has loaded, and custom.min.js binds
+                 * tooltips once on ready - so rows drawn later have none unless
+                 * they are bound on each draw. */
+                drawCallback: function() {
+                    $('#employeeTable [data-toggle="tooltip"]').tooltip();
+                },
                 "language": datatableLang,
             });
 
@@ -290,9 +412,13 @@
                 id + '"><label class="col-3 control-label"\n' +
                 'for="is_open_' + id + '" ></label></td>');
             
-            var driverImage = val.profilePictureURL == '' || val.profilePictureURL == null ? '<img alt="" width="100%" style="width:70px;height:70px;" src="' + placeholderImage + '" alt="image">' : '<img onerror="this.onerror=null;this.src=\'' + placeholderImage + '\'" alt="" width="100%" style="width:70px;height:70px;" src="' + val.profilePictureURL + '" alt="image">'
-            html.push('<td>'+driverImage+'</td>')
-            html.push('<td><a href="' + route1 + '">' + val.driverName + '</a></td>');
+            /* Picture and name in one cell, as Store Info does on the stores
+             * list, rather than a column of its own. */
+            var photo = val.profilePictureURL ? val.profilePictureURL : placeholderImage;
+            html.push('<td><img alt="" width="100%" style="width:70px;height:70px;" src="' + photo +
+                '" onerror="this.onerror=null;this.src=&quot;' + placeholderImage + '&quot;" alt="image">' +
+                '<a href="' + route1 + '" class="left_space">' + val.driverName + '</a></td>');
+            html.push('<td>' + (val.storeTitle || '') + '</td>');
             html.push('<td>' + val.email + '</td>');
             var roleTitle = roleCache[val.employeePermissionId] || '—';
             html.push('<td>' + roleTitle + '</td>');
@@ -304,17 +430,17 @@
             html.push('<td>' + val.createdDate + '</td>');            
 
             var action = '';
-            action +=  '<span class="action-btn"><a href="' + route1 + '"><i class="fa fa-edit"></i></a>';
+            action +=  '<span class="action-btn"><a href="' + route1 + '" data-toggle="tooltip" title="{{ trans('lang.edit') }}"><i class="fa fa-edit"></i></a>';
             var permId = val.employeePermissionId || '';  
             var permId = val.employeePermissionId || '';
             action += '<a href="javascript:void(0)" ' +
                     'class="view-permissions text-info" ' +
                     'data-permission-id="' + permId + '" ' +
                     'data-employee-name="' + (val.driverName || "{{trans('lang.employee')}}") + '" ' +
-                    'title="{{trans('lang.view_permissions')}}">' +
+                    'data-toggle="tooltip" title="{{trans('lang.view_permissions')}}">' +
                     '<i class="mdi mdi-account-check"></i></a>';
            
-            action += '<a id="' + val.id + '" class="do_not_delete" name="employee-delete" href="javascript:void(0)"><i class="fa fa-trash"></i></a>';
+            action += '<a id="' + val.id + '" class="do_not_delete" name="employee-delete" href="javascript:void(0)" data-toggle="tooltip" title="{{ trans('lang.delete') }}"><i class="fa fa-trash"></i></a>';
             
             action +=  '</span>';
             html.push(action);
@@ -418,7 +544,7 @@
         });
         $(document).on("click", ".create-btn", function(e) {
             if (!vendorId) {
-                alert("{{trans('lang.please_add_your_restaurant_details_before_creating_an_employee')}}");
+                alert("{{trans('lang.no_store_found_create_one_first')}}");
                 return;
             }
 

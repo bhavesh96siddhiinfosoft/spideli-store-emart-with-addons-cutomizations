@@ -2072,14 +2072,11 @@
                         'subscriptionTotalOrders': subscriptionTotalOrders.toString()
                     });                    
             }
-            var vendorWallet = isNaN(vendordata.wallet_amount) || vendordata.wallet_amount == undefined
-            ? 0 : parseFloat(vendordata.wallet_amount);
-            var newVendorWallet = vendorWallet + vendorAmount + parseFloat(orderTaxAmount);
-            await database.collection('users')
-                .doc(vendorAuthor)
-                .update({
-                    'wallet_amount': parseFloat(newVendorWallet).toFixed(decimal_degits)
-            });
+            /* Credited to the store that made the sale and to its account. This
+             * used to write the account only, and wrote it as a string - the
+             * result of .toFixed() - which is why balances are parsed on read. */
+            await applyVendorWalletDelta(selectedRestaurantId, vendorAuthor,
+                vendorAmount + parseFloat(orderTaxAmount));
         }
     }
     

@@ -619,11 +619,10 @@
                 })
             
             
-            }if (userData.wallet_amount != undefined) {
-                var wallet = userData.wallet_amount;
-            } else {
-                var wallet = 0;
             }
+            /* The balance of the store being edited, not the account total - this
+             * is a store record, and a payout from it is drawn on this balance. */
+            var wallet = await storeWalletAmount(id);
             if (currencyAtRight) {
                 var price_val = parseFloat(wallet).toFixed(decimal_degits) + "" + currentCurrency;
             } else {

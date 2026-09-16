@@ -749,9 +749,18 @@
             userDetailsRef.get().then(async function(userSnapshots) {
 
                 var userDetails = userSnapshots.docs[0].data();
-                if (userDetails.wallet_amount != undefined && userDetails.wallet_amount != '' && !isNaN(
-                        userDetails.wallet_amount)) {
-                    wallet_amount = parseFloat(userDetails.wallet_amount);
+
+                /* A subscription belongs to a store, so it is paid for out of
+                 * that store's balance rather than the account total. `vendorId`
+                 * is filled in by a promise that is not awaited, so the store is
+                 * resolved here rather than raced for. */
+                if (!vendorId) {
+                    vendorId = await resolveCurrentStoreId(userId);
+                }
+
+                wallet_amount = await storeWalletAmount(vendorId);
+
+                if (wallet_amount > 0) {
                     $("#wallet").attr('disabled', false);
                     $("#user_wallet_amount").val(wallet_amount);
                 }
@@ -1133,9 +1142,7 @@
                         'payment_type': payment_method
                     }).then(async function(snapshot) {
                         wallet_amount = wallet_amount - total_pay;
-                        database.collection('users').doc(userId).update({
-                            'wallet_amount': wallet_amount
-                        }).then(async function(result) {
+                        applyVendorWalletDelta(vendorId, userId, -total_pay).then(async function(result) {
                             walletId = database.collection("tmp").doc().id;
                             database.collection('wallet').doc(walletId).set({
                                 'amount': parseFloat(total_pay),

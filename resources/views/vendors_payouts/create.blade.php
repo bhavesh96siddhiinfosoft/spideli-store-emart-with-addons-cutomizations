@@ -154,21 +154,11 @@
         }
     });
 
+    /* A payout is drawn on the store that earned the money, not on the account.
+     * This used to look up a user by `vendorID`, which on an account with more
+     * than one store could return the wrong person entirely. */
     async function remainingPrice(vendorID) {
-        var remaining = 0;
-
-        await database.collection('users').where("vendorID", "==", vendorID).get().then(async function (snapshotss) {
-            if (snapshotss.docs.length) {
-                userdata = snapshotss.docs[0].data();
-                if (isNaN(userdata.wallet_amount) || userdata.wallet_amount == undefined) {
-                    remaining = 0;
-                } else {
-                    remaining = userdata.wallet_amount;
-                }
-
-            }
-        });
-        return remaining;
+        return await storeWalletAmount(vendorID);
     }
 
     async function remainingPriceOLD(vendorID) {
@@ -333,13 +323,13 @@
                             'withdrawMethod':withdrawMethod
                         }).then(async function () {
 
-                            if (vendorId != '' && (amount != '' || amount != NaN)) {
-                                if (remaining > 0) {
-                                    price = remaining - amount;
-                                }else {
-                                    price = amount;
-                                }
-                                database.collection('users').doc(vendorUserId).update({ 'wallet_amount': price });
+                            /* A payout takes money out, so the balance only ever
+                             * goes down by the amount paid. The old branch here
+                             * set the balance TO the payout amount whenever the
+                             * balance was zero, which credited the wallet instead
+                             * of debiting it. */
+                            if (vendorId != '' && !isNaN(parseFloat(amount))) {
+                                await applyVendorWalletDelta(vendorId, vendorUserId, -parseFloat(amount));
                             }
                             
                             if (currencyAtRight) {
