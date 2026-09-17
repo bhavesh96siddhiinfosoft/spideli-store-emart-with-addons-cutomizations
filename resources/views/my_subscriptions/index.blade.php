@@ -50,6 +50,7 @@
                                         <tr>
                                             <th>{{ trans('lang.image') }}</th>
                                             <th>{{ trans('lang.plan_name') }}</th>
+                                            <th>{{ trans('lang.store_info') }}</th>
                                             <th>{{ trans('lang.price') }}</th>
                                             <th>{{ trans('lang.payment_method') }}</th>
                                             <th>{{ trans('lang.active_at') }}</th>
@@ -75,6 +76,21 @@
     <script type="text/javascript">
         var database = firebase.firestore();
         var vedorUserId = "<?php echo $id; ?>";
+
+        /* A subscription is paid for by a store, so the list says which one.
+         * Rows written before stores were recorded have no store and show a
+         * dash - they are history and cannot be attributed after the fact. */
+        var storeTitles = {};
+
+        async function loadStoreTitles() {
+            var snapshot = await database.collection('vendors')
+                .where('author', '==', vedorUserId).get();
+
+            snapshot.docs.forEach(function (doc) {
+                var store = doc.data();
+                storeTitles[store.id || doc.id] = store.title || '';
+            });
+        }
         var placeholderImage = '';
         var currentCurrency = '';
         var currencyAtRight = false;
@@ -96,12 +112,16 @@
         })
       
         ref = database.collection('subscription_history');
-        $(document).ready(function() {
+        $(document).ready(async function() {
             $(document.body).on('click', '.redirecttopage', function() {
                 var url = $(this).attr('data-url');
                 window.location.href = url;
             });
             jQuery("#data-table_processing").show();
+
+            /* Before the table draws - the rows name a store id, and this is
+             * what turns it into a title. */
+            await loadStoreTitles();
             const table = $('#example24').DataTable({
                 pageLength: 10, // Number of rows per page
                 processing: false, // Show processing indicator
@@ -113,8 +133,8 @@
                     const searchValue = data.search.value.toLowerCase();
                     const orderColumnIndex = data.order[0].column;
                     const orderDirection = data.order[0].dir;
-                    const orderableColumns = ['', 'name', 'price', 'payment_type', 'createdAt',
-                        'expiry_date', ''
+                    const orderableColumns = ['', 'name', 'storeTitle', 'price', 'payment_type',
+                        'createdAt', 'expiry_date', ''
                     ]; // Ensure this matches the actual column names
                     const orderByField = orderableColumns[orderColumnIndex];
                     if (searchValue.length >= 3 || searchValue.length === 0) {
@@ -154,16 +174,18 @@
                             childData.price = price ? price : 0.00;
                             var date = '';
                             var time = '';
-                            if (childData.hasOwnProperty("expiry_date") && childData
-                                .expiry_date != '' && childData.expiry_date != null) {
+                            /* Rows written from the wallet before 17 Sep 2026
+                             * carry `expire_date` rather than `expiry_date`, so
+                             * their expiry never appeared here. Both are read. */
+                            var expiryValue = childData.expiry_date || childData.expire_date;
+                            if (expiryValue != '' && expiryValue != null) {
                                 try {
-                                    date = childData.expiry_date.toDate()
-                                        .toDateString();
-                                    time = childData.expiry_date.toDate()
-                                        .toLocaleTimeString('en-US');
+                                    date = expiryValue.toDate().toDateString();
+                                    time = expiryValue.toDate().toLocaleTimeString('en-US');
                                 } catch (err) {
                                 }
                             }
+                            childData.storeTitle = storeTitles[childData.vendorID] || '';
                             var expiresAt = date + ' ' + time;
                             childData.expiresAt = expiresAt;
                             if (childData.hasOwnProperty("createdAt") && childData
@@ -261,10 +283,10 @@
                     }
                 },
                 order: [
-                    ['4', 'desc']
+                    ['5', 'desc']
                 ],
                 columnDefs: [{
-                        targets: 4,
+                        targets: 5,
                         type: 'date',
                         render: function(data) {
                             return data;
@@ -272,7 +294,7 @@
                     },
                     {
                         orderable: false,
-                        targets: [0, 6]
+                        targets: [0, 7]
                     },
                 ],
                 "language": datatableLang,
@@ -295,6 +317,7 @@
                 '\'" class="rounded" style="width:50px" src="' + val.subscription_plan.image + '" alt="image"></td>'
                 );
             html.push('<td>' + val.subscription_plan.name +' '+ activeClass+'</td>');
+            html.push('<td>' + (val.storeTitle ? val.storeTitle : '-') + '</td>');
             html.push('<td>' + val.price + '</td>');
             if (val.payment_type.toString().toLowerCase() == "stripe") {
                 image = '{{ asset('images/stripe.png') }}';

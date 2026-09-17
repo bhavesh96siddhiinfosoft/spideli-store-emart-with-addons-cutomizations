@@ -242,6 +242,8 @@
                         await database.collection('subscription_history').doc(id_order).set({
                             'id': id_order,
                             'user_id': userId,
+                            /* Which store this payment was for. */
+                            'vendorID': vendorId || '',
                             'expiry_date': expiryDay,
                             'createdAt': createdAt,
                             'subscription_plan': planData,

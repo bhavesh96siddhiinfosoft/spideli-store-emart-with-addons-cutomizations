@@ -1136,7 +1136,14 @@
                     await database.collection('subscription_history').doc(id_order).set({
                         'id': id_order,
                         'user_id': userId,
-                        'expire_date': expiryDay,
+                        /* Which store this payment was for. Without it a vendor
+                         * with several stores sees one merged list, and an admin
+                         * extending an expiry cannot tell the rows apart. */
+                        'vendorID': vendorId || '',
+                        /* Was 'expire_date' here and 'expiry_date' everywhere
+                         * else, so a subscription paid for from the wallet showed
+                         * no expiry date at all on My Subscriptions. */
+                        'expiry_date': expiryDay,
                         'createdAt': createdAt,
                         'subscription_plan': planData,
                         'payment_type': payment_method

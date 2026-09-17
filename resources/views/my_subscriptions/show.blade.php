@@ -145,13 +145,14 @@
                 $('#order_limit').html((data.subscription_plan.orderLimit!='-1') ? data.subscription_plan.orderLimit : "{{trans('lang.unlimited')}}");
                 var date = '';
                 var time = '';
-                if (data.hasOwnProperty("expiry_date") && data
-                    .expiry_date != '' && data.expiry_date != null ) {
+                /* Rows written from the wallet before 17 Sep 2026 carry
+                 * `expire_date` rather than `expiry_date`, so their expiry read
+                 * as unlimited here. Both are accepted. */
+                var expiryValue = data.expiry_date || data.expire_date;
+                if (expiryValue != '' && expiryValue != null) {
                     try {
-                        date = data.expiry_date.toDate()
-                            .toDateString();
-                        time = data.expiry_date.toDate()
-                            .toLocaleTimeString('en-US');
+                        date = expiryValue.toDate().toDateString();
+                        time = expiryValue.toDate().toLocaleTimeString('en-US');
                     } catch (err) {
                     }
                     $('#expire_at').html(date + ' ' + time);
