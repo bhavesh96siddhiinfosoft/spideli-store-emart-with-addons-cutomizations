@@ -2066,11 +2066,15 @@
         if (vendordata) {
             if (parseInt(subscriptionTotalOrders) != -1) {
                 subscriptionTotalOrders = parseInt(subscriptionTotalOrders) - 1;
+                /* The store, not its owner. This used the owner's user id as a
+                 * store document id, so the write went to a document that does
+                 * not exist and a store's remaining order count never went down
+                 * on a POS sale. */
                 await database.collection('vendors')
-                    .doc(vendorAuthor)
+                    .doc(selectedRestaurantId)
                     .update({
                         'subscriptionTotalOrders': subscriptionTotalOrders.toString()
-                    });                    
+                    });
             }
             /* Credited to the store that made the sale and to its account. This
              * used to write the account only, and wrote it as a string - the
