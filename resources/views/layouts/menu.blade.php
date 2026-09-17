@@ -525,12 +525,15 @@
 
         $('#sidebarnav').append(newLi);
 
+        /* The subscription belongs to the store the panel is working on, not to
+         * the account. Reading the account copy meant a vendor who subscribed
+         * one store was treated as subscribed with any store selected.
+         *
+         * This runs on every page, and the result is posted below, so the flag
+         * the paywall reads corrects itself as soon as a vendor moves between
+         * stores. */
         if (commisionModel || subscriptionModel) {
-            if (userData.hasOwnProperty('subscriptionPlanId') && userData.subscriptionPlanId != null) {
-                var isSubscribed = true;
-            } else {
-                var isSubscribed = false;
-            }
+            var isSubscribed = await storeIsSubscribed(vendorUserId);
         } else {
             var isSubscribed = '';
         }

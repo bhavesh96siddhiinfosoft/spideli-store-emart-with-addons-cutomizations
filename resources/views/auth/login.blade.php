@@ -330,6 +330,54 @@
 
         <script type="text/javascript">
             var database = firebase.firestore();
+
+            /* Whether the store this owner is working on has a subscription.
+             *
+             * A subscription belongs to the STORE, not the account - a vendor
+             * with two stores subscribes each separately. Reading the account
+             * copy let one subscribed store carry every store on the account
+             * past the paywall.
+             *
+             * This screen has no access to the helpers in layouts/app.blade.php,
+             * so it carries its own copy. It answers the same question as
+             * storeIsSubscribed() there; keep the two in step.
+             *
+             * `users.vendorID` names the selected store. When it is missing or
+             * names a store that is gone, the first store on the account is used,
+             * which is what the panel itself settles on. */
+            async function loginStoreIsSubscribed(ownerUserId) {
+                try {
+                    const stores = await database.collection('vendors')
+                        .where('author', '==', ownerUserId).get();
+
+                    if (stores.empty) {
+                        return false;
+                    }
+
+                    const userSnapshot = await database.collection('users').doc(ownerUserId).get();
+                    const selectedId = userSnapshot.exists ? (userSnapshot.data().vendorID || '') : '';
+
+                    let store = stores.docs[0].data();
+
+                    if (selectedId) {
+                        const match = stores.docs.find(function (doc) {
+                            const data = doc.data();
+                            return (data.id || doc.id) === selectedId;
+                        });
+
+                        if (match) {
+                            store = match.data();
+                        }
+                    }
+
+                    const planId = store.subscriptionPlanId;
+
+                    return planId !== undefined && planId !== null && planId !== '';
+                } catch (err) {
+                    console.error("Could not read the store's subscription:", err);
+                    return false;
+                }
+            }
             var subscriptionModel = false;
             var onlyPhoneNumber = '';
             var documentVerificationEnable = false;  
@@ -447,9 +495,9 @@
                                     var lastName = userData.lastName;
                                     var imageURL = userData.profilePictureURL;
                                     if (subscriptionModel || commissionModel) {
-                                        if (userData.hasOwnProperty('subscriptionPlanId') && userData
-                                            .subscriptionPlanId != '' && userData.subscriptionPlanId != null
-                                        ) {
+                                        /* The selected store's subscription, not
+                                         * the account's - see the helper above. */
+                                        if (await loginStoreIsSubscribed(userData.id)) {
                                             var isSubscribed = 'true';
                                         } else {
 
@@ -484,9 +532,9 @@
                                                 var isAutoVerified = userData.hasOwnProperty('isAutoVerify') 
                                                       ? userData.isAutoVerify 
                                                       : false;
-                                                if (userData.hasOwnProperty('subscriptionPlanId') &&
-                                                    userData.subscriptionPlanId != '' && userData
-                                                    .subscriptionPlanId != null) {
+                                                /* Same question as above, and it
+                                                 * decides where they land. */
+                                                if (isSubscribed === 'true') {
                                                     if ((documentVerificationEnable == true && isAutoVerified == false) || (documentVerificationEnable == true && isDocumentVerified == false) ) {                                                        
                                                         window.location = "{{ route('vendors.document') }}";
                                                     } else if(documentVerificationEnable && isAutoVerified){
@@ -665,9 +713,9 @@
                                         var lastName = userData.lastName;
                                         var imageURL = '';
                                         if (subscriptionModel || commissionModel) {
-                                            if (userData.hasOwnProperty('subscriptionPlanId') && userData
-                                                .subscriptionPlanId != '' && userData.subscriptionPlanId != null
-                                            ) {
+                                            /* The selected store's subscription,
+                                             * not the account's. */
+                                            if (await loginStoreIsSubscribed(userData.id)) {
                                                 var isSubscribed = 'true';
                                             } else {
 
@@ -704,9 +752,8 @@
                                                     var isAutoVerified = userData.hasOwnProperty('isAutoVerified') 
                                                       ? userData.isDocumentVerify 
                                                       : false;
-                                                    if (userData.hasOwnProperty('subscriptionPlanId') &&
-                                                        userData.subscriptionPlanId != '' && userData
-                                                        .subscriptionPlanId != null) {
+                                                    /* Same question as above. */
+                                                    if (isSubscribed === 'true') {
                                                        if ((documentVerificationEnable == true && isAutoVerified == false) || (documentVerificationEnable == true && isDocumentVerified == false) ) {                                                        
                                                             window.location = "{{ route('vendors.document') }}";
                                                         } else if(documentVerificationEnable && isAutoVerified){
@@ -835,7 +882,8 @@
                             var documentVerify=userData.hasOwnProperty('isDocumentVerify')? userData.isDocumentVerify:false;
                             setCookie('documentVerify',documentVerify);
                             if(subscriptionModel||commisionModel) {
-                                if(userData.hasOwnProperty('subscriptionPlanId')&&userData.subscriptionPlanId!='' &&userData.subscriptionPlanId!=null) {
+                                /* The selected store's subscription, not the account's. */
+                                if (await loginStoreIsSubscribed(userData.id)) {
                                     var isSubscribed='true';
                                 } else {
                                     var isSubscribed='false';
@@ -872,9 +920,8 @@
                                         var isAutoVerified = userData.hasOwnProperty('isAutoVerified') 
                                                 ? userData.isDocumentVerify 
                                                 : false;
-                                        if (userData.hasOwnProperty('subscriptionPlanId') &&
-                                            userData.subscriptionPlanId != '' && userData
-                                            .subscriptionPlanId != null) {
+                                        /* Same question as above. */
+                                        if (isSubscribed === 'true') {
                                             if ((documentVerificationEnable == true && isAutoVerified == false) || (documentVerificationEnable == true && isDocumentVerified == false) ) {                                                        
                                                 window.location = "{{ route('vendors.document') }}";
                                             } else if(documentVerificationEnable && isAutoVerified){

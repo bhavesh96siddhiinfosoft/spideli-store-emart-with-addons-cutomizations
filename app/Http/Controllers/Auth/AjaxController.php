@@ -170,29 +170,36 @@ class AjaxController extends Controller
             'access' => true,
         ]);
     }
+    /**
+     * Record whether the store the panel is working on is subscribed.
+     *
+     * Scoped to the signed-in user. It used to update by the email in the
+     * request body, which meant any signed-in vendor could flip another
+     * vendor's paywall flag by posting their address. The email is still
+     * accepted from existing callers and ignored.
+     *
+     * The value is computed in the browser: the panel reads Firestore
+     * client-side and the server has no connection to it.
+     */
     public function setSubcriptionFlag(Request $request)
 
     {
 
-        User::where('email', $request->email)->update([
+        $data = array();
+
+        if (!Auth::check()) {
+
+            return $data;
+
+        }
+
+        User::where('id', Auth::id())->update([
 
             'isSubscribed' => $request->isSubscribed
 
         ]);
 
-
-
-        $data = array();
-
-        if (Auth::check()) {
-
-            $data['access'] = true;
-
-        }
-
-
-
-
+        $data['access'] = true;
 
         return $data;
 

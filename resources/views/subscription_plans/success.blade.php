@@ -275,9 +275,10 @@
                                                 ? userData.isAutoVerify 
                                                 : false;                                                
 
-                                            if (userData.hasOwnProperty('subscriptionPlanId') &&
-                                                userData.subscriptionPlanId != '' && userData
-                                                .subscriptionPlanId != null) {
+                                            /* The store that was just paid for, not the account. A
+                                             * vendor with two stores has one subscribed and one not,
+                                             * and the account copy cannot tell them apart. */
+                                            if (await storeIsSubscribed(userId)) {
                                                 if (documentVerificationEnable && (!isDocumentVerified || userData.isDocumentVerify)) {                                                        
                                                     window.location = "{{ route('vendors.document') }}";
                                                 } else if(documentVerificationEnable && isAutoVerified){

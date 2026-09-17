@@ -630,7 +630,36 @@
 
                 await db.collection('users').doc(ownerUserId).update({ 'vendorID': storeId });
 
+                /* The paywall flag is a MySQL column, written once at login. The
+                 * store has just changed, so the answer may have changed with it
+                 * - without this a vendor could switch from a subscribed store to
+                 * an unsubscribed one and keep the access they had. */
+                await refreshSubscriptionFlag(ownerUserId);
+
                 return true;
+            }
+
+            /* Recomputes the paywall flag for the store now selected and records
+             * it against the logged-in session. Failing to reach the server is
+             * not fatal: the page still reloads and the flag is corrected at the
+             * next login, so the vendor is never stranded by a network blip. */
+            async function refreshSubscriptionFlag(ownerUserId) {
+                try {
+                    const subscribed = await storeIsSubscribed(ownerUserId);
+
+                    await $.ajax({
+                        type: 'POST',
+                        url: "{{ route('setSubcriptionFlag') }}",
+                        data: {
+                            isSubscribed: subscribed ? 'true' : 'false'
+                        },
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        }
+                    });
+                } catch (err) {
+                    console.error("Could not refresh the subscription flag:", err);
+                }
             }
 
             /* The currency this panel should display prices in.
@@ -717,6 +746,29 @@
                 const store = await resolveCurrentStore(ownerUserId);
 
                 return (store && store.id) ? store.id : '';
+            }
+
+            /* Whether the store the panel is working on has a subscription.
+             *
+             * A subscription belongs to the STORE, not the account - a vendor
+             * with two stores subscribes each of them separately. The account
+             * copy on `users` is still written, because the app reads it, but it
+             * answers "has this vendor ever subscribed anything", which is not
+             * the question a paywall should ask.
+             *
+             * Deliberately the same test as before - a plan id is present - and
+             * not an expiry check. Adding expiry here would lock out anyone the
+             * old gate let through, which is a separate decision. */
+            async function storeIsSubscribed(ownerUserId) {
+                const store = await resolveCurrentStore(ownerUserId);
+
+                if (!store) {
+                    return false;
+                }
+
+                const planId = store.subscriptionPlanId;
+
+                return planId !== undefined && planId !== null && planId !== '';
             }
 
             /* ---- The vendor balance ----
