@@ -54,6 +54,7 @@
                                 <tr>
                                     <th>{{trans('lang.order_id')}}</th>
                                     <th>{{trans('lang.order_user_id')}}</th>
+                                    <th>{{trans('lang.store_info')}}</th>
                                     <th>{{trans('lang.order_order_status_id')}}</th>
                                     <th>{{trans('lang.amount')}}</th>
                                     <th>{{trans('lang.order_type')}}</th>
@@ -115,28 +116,24 @@
                 $('.page-menu').html('<p class="text-center text-danger font-weight-bold">{{ trans("lang.no_permission") }}</p>');                   
                 return;
             }
-            const vendorSnap = await database
-                .collection('vendors')
-                .where('id', '==', empVendorId)
-                .limit(1)
-                .get();
-
-            if (vendorSnap.empty) {
-                console.error('Vendor not found for employee');
-                return;
-            }
-
-            const authorId = vendorSnap.docs[0].data().author;
+            /* An employee belongs to one store and sees that store's orders. */
             ref = database
                 .collection('vendor_orders')
                 .where('isPosOrder','==',false)
-                .where('vendor.author','==',authorId)
+                .where('vendorID','==',empVendorId)
                 .orderBy('createdAt','desc');
         }else{
+            /* The store the panel is working on, not the whole account.
+             *
+             * This queried `vendor.author`, which is the OWNER, so every store a
+             * vendor owned had its orders listed together with nothing to tell
+             * them apart. With one store per vendor that was the same set of
+             * orders either way; with several it is not, and a vendor working on
+             * one store was being shown another store's orders. */
             ref = database
             .collection('vendor_orders')
             .where('isPosOrder','==',false)
-            .where('vendor.author','==',user_id)
+            .where('vendorID','==', await resolveCurrentStoreId(user_id))
             .orderBy('createdAt','desc');
         }
         $(document.body).on('click', '.redirecttopage', function () {
@@ -151,6 +148,7 @@
                 columns: [
                     { key: 'id', header: "{{trans('lang.order_id')}}" },
                     { key: 'clientName', header: "{{trans('lang.order_user_id')}}" },                            
+                    { key: 'storeTitle', header: "{{trans('lang.store_info')}}" },
                     { key: 'status', header: "{{trans('lang.order_order_status_id')}}" }, 
                     { key: 'amount', header: "{{trans('lang.amount')}}" },
                     { key: 'orderType', header: "{{trans('lang.order_type')}}" },
@@ -172,7 +170,7 @@
                 const searchValue = data.search.value.toLowerCase();
                 const orderColumnIndex = data.order[0].column;
                 const orderDirection = data.order[0].dir;                    
-                const orderableColumns = ['id', 'clientName', 'status', 'amount', 'orderType', 'createdAt','']; // Ensure this matches the actual column names
+                const orderableColumns = ['id', 'clientName', '', 'status', 'amount', 'orderType', 'createdAt','']; // Ensure this matches the actual column names
                 
                 const orderByField = orderableColumns[orderColumnIndex]; // Adjust the index to match your table
 
@@ -204,6 +202,12 @@
                         }else{
                             childData.clientName = '{{trans("lang.unknown")}}';
                         }
+                        /* The store this order belongs to. Orders here span every
+                         * store on the account, so it is sortable and searchable
+                         * like any other column. */
+                        childData.storeTitle = (childData.vendor && childData.vendor.title)
+                            ? childData.vendor.title : '';
+
                         var price =  await buildHTMLProductstotal(childData);
                         childData.amount = price;
                         
@@ -226,6 +230,7 @@
                             var createdAt = date + ' ' + time;
                             if (
                                 (childData.clientName && childData.clientName.toString().toLowerCase().includes(searchValue)) ||
+                                (childData.storeTitle && childData.storeTitle.toString().toLowerCase().includes(searchValue)) ||
                                 (childData.amount && childData.amount.toString().includes(searchValue))
                                 || (childData.orderType && childData.orderType.toString().toLowerCase().includes(searchValue)) || (childData.amount && childData.amount.toString().toLowerCase().includes(searchValue)) || (childData.id && childData.id.toString().toLowerCase().includes(searchValue)) || (createdAt && createdAt.toString().toLowerCase().includes(searchValue)) || (childData.status && childData.status.toString().toLowerCase().includes(searchValue))
                             ) {
@@ -286,9 +291,9 @@
                 });
             },
             columnDefs: [
-                {orderable: false, targets: [6]},
+                {orderable: false, targets: [2, 7]},
             ],
-            order: [5, 'desc'],
+            order: [6, 'desc'],
            "language": datatableLang,
             dom: 'lfrtipB',
                 buttons: [
@@ -344,6 +349,12 @@
 
         html.push('<a href="'+route1+'">' + val.id + '</a>');
         html.push(val.clientName);
+        /* The store the panel is working on. Since the list was scoped to that
+         * store, every row carries the same name - it is a "you are here" marker
+         * rather than a way of telling rows apart, so the column does not offer
+         * a sort. The order carries the store's own title, so no lookup is
+         * needed. */
+        html.push(val.storeTitle || '');
 
         if (val.status == 'Order Placed') {
             html.push('<span class="badge badge-warning ">' + val.status + '</span>');

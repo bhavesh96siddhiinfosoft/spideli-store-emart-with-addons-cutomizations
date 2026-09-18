@@ -74,6 +74,7 @@
                                                     <a id="deleteAll" class="do_not_delete" href="javascript:void(0)"><i
                                                             class="fa fa-trash"></i> {{ trans('lang.all') }}</a></label>
                                                 <th>{{ trans('lang.item_info') }}</th>
+                                                <th>{{ trans('lang.store_info') }}</th>
                                                 <th>{{ trans('lang.item_price') }}</th>
                                                 <th>{{ trans('lang.item_category_id') }}</th>
                                                 <th>{{ trans('lang.item_publish') }}</th>
@@ -228,9 +229,18 @@
                 }
             }
         });
-        getVendorId(vendorUserId).then(data => {
+        /* This list only ever shows the store the panel is working on, so every
+         * row carries the same store name. It is there as a "you are here"
+         * marker now that a vendor may own several stores and switch between
+         * them - not to tell rows apart, which it cannot do. */
+        var selectedStoreTitle = '';
+
+        getVendorId(vendorUserId).then(async data => {
             vendorId = data;
             ref = database.collection('vendor_products').where('vendorID', "==", vendorId);
+
+            var selectedStore = await resolveCurrentStore(vendorUserId);
+            selectedStoreTitle = (selectedStore && selectedStore.title) ? selectedStore.title : '';
             $(document).ready(function() {                    
                     $(document.body).on('click', '.redirecttopage', function() {
                         var url = $(this).attr('data-url');
@@ -249,6 +259,10 @@
                         columns: [{
                                 key: 'name',
                                 header: "{{ trans('lang.item_info') }}"
+                            },
+                            {
+                                key: 'storeTitle',
+                                header: "{{ trans('lang.store_info') }}"
                             },
                             {
                                 key: 'finalPrice',
@@ -278,7 +292,7 @@
                                 const searchValue = data.search.value.toLowerCase();
                                 const orderColumnIndex = data.order[0].column;
                                 const orderDirection = data.order[0].dir;
-                                const orderableColumns = ['', 'name', 'finalPrice', 'category', '', 'createdDate', '']; // Ensure this matches the actual column names
+                                const orderableColumns = ['', 'name', '', 'finalPrice', 'category', '', 'createdDate', '']; // Ensure this matches the actual column names
 
                                 const orderByField = orderableColumns[
                                     orderColumnIndex]; // Adjust the index to match your table
@@ -337,6 +351,10 @@
                                                         '{{ trans('lang.unknown') }}';
                                                 }
                                                 childData.category = category;
+                                                /* Same for every row, but the
+                                                 * export reads the record rather
+                                                 * than the table. */
+                                                childData.storeTitle = selectedStoreTitle;
                                                 childData.publish = childData
                                                     .publish ? 'Yes' : 'No';
                                                 if (searchValue) {
@@ -432,9 +450,9 @@
                         },
                         columnDefs: [{
                             orderable: false,
-                            targets: [0, 4, 6]
+                            targets: [0, 2, 5, 7]
                         }, ],
-                        order: [5, 'asc'],
+                        order: [6, 'asc'],
                         "language": datatableLang,
                         dom: 'lfrtipB',
                         buttons: [{
@@ -517,6 +535,8 @@
                     '\'"><a data-url="' + route1 + '" href="' + route1 + '" class="left_space redirecttopage">' +
                     val.name + tax_titles + '</a>');
             }
+
+            html.push(selectedStoreTitle);
 
             if (val.item_attribute && val.item_attribute.variants && val.item_attribute.variants.length > 0) {
 

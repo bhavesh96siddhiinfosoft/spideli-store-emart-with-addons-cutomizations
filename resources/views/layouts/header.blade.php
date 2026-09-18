@@ -4,9 +4,9 @@
         <b>
             <!--You can put here icon as well // <i class="wi wi-sunset"></i> //-->
             <!-- Dark Logo icon -->
-            <img src="{{ asset('/images/logo_web.png') }}" onerror="this.onerror=null; this.src='{{ asset('/images/logo_web.png') }}';" alt="homepage" class="dark-logo" width="100%" id="logo_web">
+            <img src="{{ asset('/images/spideli_dark_logo.png') }}" onerror="this.onerror=null; this.src='{{ asset('/images/spideli_dark_logo.png') }}';" alt="homepage" class="dark-logo" width="100%" id="logo_web">
             <!-- Light Logo icon -->
-            <img src="{{ asset('images/logo-light-icon.png') }}" onerror="this.onerror=null; this.src='{{ asset('images/logo-light-icon.png') }}';" alt="homepage" class="light-logo">
+            <img src="{{ asset('images/spideli_light_logo.png') }}" onerror="this.onerror=null; this.src='{{ asset('images/spideli_light_logo.png') }}';" alt="homepage" class="light-logo">
         </b>
         <!--End Logo icon -->
         <!-- Logo text -->
@@ -32,6 +32,20 @@
     <!-- ============================================================== -->
     <!-- User profile and search -->
     <!-- ============================================================== -->
+    {{-- The regions this account's stores are in, not every region on the
+         platform. Hidden until it is filled, so an account whose stores have no
+         region does not get an empty control. Populated by loadHeaderRegions()
+         in layouts/app.blade.php - this file is included before that script
+         block, so nothing here may call it directly. --}}
+    <div style="display: none;" class="region-list icon d-flex align-items-center text-light ml-2" id="region_dropdown_box">
+        <div class="region-select">
+            <i class="mdi mdi-earth"></i>
+        </div>
+        <div class="region-options">
+            <select class="form-control text-dark" id="region_dropdown"></select>
+        </div>
+    </div>
+
     <div style="visibility: hidden;" class="language-list icon d-flex align-items-center text-light ml-2" id="language_dropdown_box">
         <div class="language-select">
             <i class="fa fa-globe"></i>

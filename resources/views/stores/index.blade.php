@@ -483,6 +483,8 @@
 
         var routeEdit = '{{ route('stores.edit', ':id') }}'.replace(':id', id);
         var routeView = '{{ route('stores.view', ':id') }}'.replace(':id', id);
+        var routeItems = '{{ route('items') }}';
+        var routeOrders = '{{ route('orders') }}';
 
         html.push('<span class="delete-all"><input type="checkbox" id="is_open_' + id + '" class="is_open" dataId="' + id + '">' +
             '<label class="col-3 control-label" for="is_open_' + id + '"></label></span>');
@@ -509,7 +511,7 @@
         var photo = val.photo ? val.photo : placeholderImage;
         html.push('<img alt="" width="100%" style="width:70px;height:70px;" src="' + photo +
             '" onerror="this.onerror=null;this.src=\'' + placeholderImage + '\'" alt="image">' +
-            '<a href="' + routeView + '" class="redirecttopage left_space">' + (val.title || '') + '</a>');
+            '<a href="' + routeEdit + '" class="left_space">' + (val.title || '') + '</a>');
 
         html.push(regionNames[val.regionId] ? regionNames[val.regionId] : '');
 
@@ -531,8 +533,13 @@
         }
         html.push(created != null ? '<span class="dt-time">' + date + '<br> ' + time + '</span>' : '');
 
-        html.push(val.items);
-        html.push(val.orders);
+        /* The counts open that store's Items and Orders. Both screens show the
+         * SELECTED store, so the click switches the panel to this store first -
+         * see the handler below. */
+        html.push('<a href="javascript:void(0)" name="store-items" class="do_not_delete" dataId="' + id +
+            '" data-go="' + routeItems + '">' + val.items + '</a>');
+        html.push('<a href="javascript:void(0)" name="store-orders" class="do_not_delete" dataId="' + id +
+            '" data-go="' + routeOrders + '">' + val.orders + '</a>');
 
         return html;
     }
@@ -544,6 +551,37 @@
 
         return snapshots.size;
     }
+
+    /* Opening a store's Items or Orders from the counts.
+     *
+     * Those screens show whichever store the panel is working on, so going
+     * straight there would show the wrong store's data. The panel is switched to
+     * this store first, exactly as the store selector does, and only then does
+     * the browser follow the link.
+     *
+     * That means clicking a count MOVES the panel to that store, which is what
+     * a vendor asking to see its items is after - but it does change what
+     * Point Of Sale and the rest show afterwards. */
+    $(document).on('click', '[name="store-items"], [name="store-orders"]', async function () {
+        var storeId = $(this).attr('dataId');
+        var destination = $(this).attr('data-go');
+
+        if (storeId === selectedStoreId) {
+            window.location.href = destination;
+            return;
+        }
+
+        jQuery("#data-table_processing").show();
+
+        var switched = await selectStore(vendorUserId, storeId);
+
+        if (!switched) {
+            jQuery("#data-table_processing").hide();
+            return;
+        }
+
+        window.location.href = destination;
+    });
 
     /* Switching store repoints the whole panel - Items, Orders, Point Of Sale and
      * the rest all read the selected store - so the page is reloaded rather than

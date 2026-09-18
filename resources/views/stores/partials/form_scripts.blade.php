@@ -22,6 +22,7 @@
         var vendorOwnerOnline = false;
         var photocount = 0;
         var ownerId = '';
+        var ownerName = '';
         var vendorUserId = "<?php echo $id; ?>";
         var id = '';
         var vendorOwnerPhoto = '';
@@ -184,14 +185,14 @@
                 subscriptionData.subscriptionExpiryDate = userData.subscriptionExpiryDate;
             }
             ownerId = userData.id;
+            /* The store records who owns it. It used to take this from a first
+             * name input, which exists on the profile screen this form was
+             * extracted from but not on the form itself - so it read `undefined`
+             * and Firestore rejected the whole save. The owner is loaded here
+             * anyway, so the name comes from the owner. */
+            ownerName = userData.firstName || '';
             ownerPhoto = userData.profilePictureURL
             vendorOwnerPhoto = userData.profilePictureURL;
-            $(".user_first_name").val(userData.firstName);
-            $(".user_last_name").val(userData.lastName);
-            if (userData.hasOwnProperty('email') && userData.email != null && userData.email != '') {
-                $(".user_email").val(userData.email).attr('readonly', true);
-            }
-            $(".user_phone").val(userData.phoneNumber);
             if (userData.profilePictureURL != '') {
                 ownerPhoto = userData.profilePictureURL;
                 ownerOldImageFile = userData.profilePictureURL;
@@ -940,10 +941,6 @@
             var longitude = parseFloat($(".vendor_longitude").val());
             var description = $(".vendor_description").val();
             var phonenumber = $(".vendor_phone").val();
-            var userFirstName = $(".user_first_name").val();
-            var userLastName = $(".user_last_name").val();
-            var email = $(".user_email").val();
-            var userPhone = $(".user_phone").val();
             var section_id = $("#section_id").val();
             var selectedCommission = $("#section_id option:selected").attr("data-commission");
             var vendorCommission = null;
@@ -1087,32 +1084,11 @@
                 "Vegetarian Friendly": Vegetarian_Friendly
             };
             
-            // Validation
-            if (userFirstName == '') {
-                jQuery("#data-table_processing").hide();
-                $(".error_top").show();
-                $(".error_top").html("<p>{{ trans('lang.enter_owners_name_error') }}</p>");
-                window.scrollTo(0, 0);
-                return false;
-            } else if (userLastName == '') {
-                jQuery("#data-table_processing").hide();
-                $(".error_top").show();
-                $(".error_top").html("<p>{{ trans('lang.enter_owners_lastname_error') }}</p>");
-                window.scrollTo(0, 0);
-                return false;
-            } else if (email == '') {
-                jQuery("#data-table_processing").hide();
-                $(".error_top").show();
-                $(".error_top").html("<p>{{ trans('lang.enter_owners_email') }}</p>");
-                window.scrollTo(0, 0);
-                return false;
-            } else if (userPhone == '') {
-                jQuery("#data-table_processing").hide();
-                $(".error_top").show();
-                $(".error_top").html("<p>{{ trans('lang.enter_owners_phone') }}</p>");
-                window.scrollTo(0, 0);
-                return false;
-            } else if (section_id == '') {
+            /* The owner's name, email and phone were validated here. They are
+             * not on this form - they belong to the profile screen - so each
+             * test compared `undefined` against '', which is false, and none of
+             * them ever fired. They are gone rather than left as decoration. */
+            if (section_id == '') {
                 jQuery("#data-table_processing").hide();
                 $(".error_top").show();
                 $(".error_top").html("<p>{{ trans('lang.select_section_error') }}</p>");
@@ -1263,7 +1239,7 @@
                     'phonenumber': phonenumber,
                     'categoryTitle': categoryTitle,
                     'coordinates': coordinates,
-                    'authorName': userFirstName,
+                    'authorName': ownerName,
                     'enabledDiveInFuture': enabledDiveInFuture,
                     'restaurantMenuPhotos': menuImages && menuImages.length > 0 ? menuImages : [],
                     'restaurantCost': restaurantCost,
@@ -1320,8 +1296,19 @@
                 }
                
                 jQuery("#data-table_processing").hide();
-                window.location.reload();
-                
+
+                /* Creating: go to the new store's own edit screen. Reloading here
+                 * returned a blank create form, so the store a vendor had just
+                 * made disappeared from view and looked as though it had failed.
+                 *
+                 * Editing: reload, which is what it did before and is right -
+                 * the screen is already the one for this store. */
+                if (id == '' || id == null) {
+                    window.location.href = "{{ route('stores.edit', ':id') }}".replace(':id', tempId);
+                } else {
+                    window.location.reload();
+                }
+
             } catch (err) {
                 console.error("Save error:", err);
                 jQuery("#data-table_processing").hide();

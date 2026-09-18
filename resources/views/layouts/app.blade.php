@@ -9,7 +9,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ config('app.name', 'Laravel') }}</title>
-        <link rel="icon" type="image/x-icon" href="{{ asset('images/logo-light-icon.png') }}">
+        <link rel="icon" type="image/x-icon" href="{{ asset('images/spideli-circle.png') }}">
         <!-- Fonts -->
         <link rel="dns-prefetch" href="//fonts.gstatic.com">
         <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">
@@ -747,6 +747,164 @@
 
                 return (store && store.id) ? store.id : '';
             }
+
+            /* Fills the header's region list with the regions this account's
+             * stores are in - not every region on the platform, which would
+             * mostly be places the vendor does not trade in.
+             *
+             * An owner may hold stores in several regions; an employee belongs
+             * to one store and sees that store's region alone.
+             *
+             * Choosing a region moves the panel to a store in it - see
+             * switchToRegion() below. The panel works on one store at a time, so
+             * "show me France" means "work on my France store".
+             *
+             * The header markup is included before this script block, so it
+             * cannot call this itself - the ready handler below does, once
+             * everything is parsed. */
+            /* The account's stores, kept so the region picker can move between
+             * them without asking Firestore again. */
+            var headerRegionStores = [];
+
+            async function loadHeaderRegions(ownerUserId) {
+                const $select = $('#region_dropdown');
+
+                if (!$select.length) {
+                    return;
+                }
+
+                try {
+                    const db = firebase.firestore();
+                    const role = "{{ $authRole ?? '' }}";
+                    const employeeStoreId = "{{ $empVendorId ?? '' }}";
+
+                    let stores;
+
+                    if (role === 'vendor') {
+                        if (!ownerUserId) {
+                            return;
+                        }
+                        stores = await db.collection('vendors').where('author', '==', ownerUserId).get();
+                    } else {
+                        if (!employeeStoreId) {
+                            return;
+                        }
+                        stores = await db.collection('vendors').where('id', '==', employeeStoreId).get();
+                    }
+
+                    const regionIds = [];
+
+                    headerRegionStores = [];
+
+                    stores.docs.forEach(function (doc) {
+                        const store = doc.data();
+                        const regionId = store.regionId;
+
+                        headerRegionStores.push({
+                            id: store.id || doc.id,
+                            regionId: regionId || '',
+                            title: store.title || ''
+                        });
+
+                        if (regionId && regionIds.indexOf(regionId) === -1) {
+                            regionIds.push(regionId);
+                        }
+                    });
+
+                    if (!regionIds.length) {
+                        return;
+                    }
+
+                    const regions = [];
+
+                    for (const regionId of regionIds) {
+                        const snapshot = await db.collection('regions').doc(regionId).get();
+
+                        if (snapshot.exists) {
+                            regions.push({ id: regionId, name: snapshot.data().name || '' });
+                        }
+                    }
+
+                    if (!regions.length) {
+                        return;
+                    }
+
+                    regions.sort(function (a, b) {
+                        return a.name.localeCompare(b.name);
+                    });
+
+                    regions.forEach(function (region) {
+                        $select.append($('<option></option>').attr('value', region.id).text(region.name));
+                    });
+
+                    /* Opens on the region the panel is working in. */
+                    const current = await resolveCurrentStore(ownerUserId);
+
+                    if (current && current.regionId) {
+                        $select.val(current.regionId);
+                    }
+
+                    /* An employee belongs to one store and has nothing to move
+                     * between, so the picker stays a label for them. */
+                    if (role === 'vendor') {
+                        $select.on('change', function () {
+                            switchToRegion(ownerUserId, $(this).val());
+                        });
+                    }
+
+                    $('#region_dropdown_box').css('display', 'flex');
+                } catch (err) {
+                    console.error("Could not load the header regions:", err);
+                }
+            }
+
+            /* Moves the panel to a store in the chosen region.
+             *
+             * The panel works on one store at a time, so "show me France" means
+             * "work on my France store". Everything - items, orders, point of
+             * sale, coupons - follows the store, and so follows the region.
+             *
+             * With more than one store in that region the first by name is
+             * taken; the vendor can pick a specific one from My Stores. If the
+             * store already selected is in that region, nothing moves. */
+            async function switchToRegion(ownerUserId, regionId) {
+                if (!regionId) {
+                    return;
+                }
+
+                const inRegion = headerRegionStores.filter(function (store) {
+                    return store.regionId === regionId;
+                });
+
+                if (!inRegion.length) {
+                    return;
+                }
+
+                const currentId = await resolveCurrentStoreId(ownerUserId);
+
+                if (inRegion.some(function (store) { return store.id === currentId; })) {
+                    return;
+                }
+
+                inRegion.sort(function (a, b) {
+                    return a.title.localeCompare(b.title);
+                });
+
+                jQuery("#data-table_processing").show();
+
+                const switched = await selectStore(ownerUserId, inRegion[0].id);
+
+                if (!switched) {
+                    jQuery("#data-table_processing").hide();
+                    return;
+                }
+
+                window.location.reload();
+            }
+
+            $(document).ready(function () {
+                loadHeaderRegions("{{ $vendorUserId ?? '' }}");
+            });
 
             /* Whether the store the panel is working on has a subscription.
              *

@@ -28756,3 +28756,41 @@ html[dir="rtl"] .required-field::after {
     white-space: normal;
     word-break: break-word;
 }
+
+/* ---- Region list (header) ----
+ *
+ * Sits beside the language picker and is styled to match it, so the two read as
+ * one pair of controls. The option colour is the language list's #ff683a rather
+ * than a new value.
+ *
+ * It is shown by loadHeaderRegions() once it has something to show - an account
+ * whose stores have no region keeps it hidden rather than offering an empty
+ * control. */
+.region-list {
+    white-space: nowrap;
+}
+
+.region-list .region-select {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.region-options select {
+    background: none;
+    border: 0;
+    color: #fff !important;
+    min-width: 130px;
+}
+
+.region-options select:focus,
+.region-options select:hover {
+    background: none !important;
+    border: 0;
+    color: #fff !important;
+    box-shadow: none;
+    outline: none;
+}
+
+.region-options select option {
+    background: #ff683a;
+}
