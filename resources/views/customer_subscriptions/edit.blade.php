@@ -83,6 +83,7 @@
         }
 
         await loadPlanStores(vendorUserId, plan.vendorID || '');
+        setPlanPoints(plan.plan_points);
 
         jQuery("#data-table_processing").hide();
     });
@@ -131,6 +132,7 @@
             'photo': image,
             'price': price,
             'expiryDay': expiryDay,
+            'plan_points': cleanedPlanPoints(),
             'isEnable': isEnable
         });
 

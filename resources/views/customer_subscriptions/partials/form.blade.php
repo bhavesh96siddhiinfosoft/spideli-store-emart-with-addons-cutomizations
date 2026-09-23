@@ -67,6 +67,18 @@
     </div>
 </fieldset>
 
+<fieldset>
+    <legend>{{ trans('lang.plan_points') }}</legend>
+
+    <div class="form-group row width-100">
+        <div class="col-12">
+            <div id="plan_points_container"></div>
+            <button type="button" class="btn btn-primary mt-2" onclick="addPlanPoint()">{{ trans('lang.add_more') }}</button>
+            <div class="form-text text-muted">{{ trans('lang.plan_points_help') }}</div>
+        </div>
+    </div>
+</fieldset>
+
 {{--
     Shared by create and edit, like the markup above. Only a function is declared
     here - nothing runs at this point, because jQuery and select2 are loaded
@@ -147,6 +159,75 @@
         } catch (err) {
             console.error("Could not load the stores for this plan:", err);
         }
+    }
+
+
+    /* The plan's selling points, shown to a customer on the plan.
+     *
+     * Same shape and field name as the platform's own plans in the admin panel -
+     * `plan_points`, an array of strings - so the two read alike wherever they
+     * are displayed side by side.
+     *
+     * The array is the truth and the inputs are redrawn from it, rather than
+     * reading the boxes back at save time. Deleting the middle of three would
+     * otherwise leave the remaining inputs carrying stale positions. */
+    var planPoints = [];
+
+    function renderPlanPoints() {
+        var container = document.getElementById('plan_points_container');
+
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = '';
+
+        planPoints.forEach(function (point, index) {
+            var row = document.createElement('div');
+            row.className = 'form-group d-flex option-row mt-1';
+
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-control';
+            /* Set as a property, not as markup - a point containing a quote
+             * would otherwise break out of the attribute. */
+            input.value = point;
+            input.addEventListener('input', function () {
+                planPoints[index] = this.value;
+            });
+
+            var remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn btn-danger ml-2';
+            remove.innerHTML = '<i class="mdi mdi-delete"></i>';
+            remove.addEventListener('click', function () {
+                planPoints.splice(index, 1);
+                renderPlanPoints();
+            });
+
+            row.appendChild(input);
+            row.appendChild(remove);
+            container.appendChild(row);
+        });
+    }
+
+    function addPlanPoint() {
+        planPoints.push('');
+        renderPlanPoints();
+    }
+
+    /* Points are optional - a plan may have none. Empty boxes are not saved as
+     * blank lines: they are dropped, so a vendor who adds a row and changes
+     * their mind is not stopped from saving. */
+    function cleanedPlanPoints() {
+        return planPoints
+            .map(function (point) { return (point || '').trim(); })
+            .filter(function (point) { return point !== ''; });
+    }
+
+    function setPlanPoints(points) {
+        planPoints = Array.isArray(points) ? points.slice() : [];
+        renderPlanPoints();
     }
 
 </script>

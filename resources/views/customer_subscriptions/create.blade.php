@@ -55,6 +55,9 @@
     document.addEventListener("DOMContentLoaded", async function () {
         await employeeMayView();
         await loadPlanStores(vendorUserId, '');
+        /* One empty row to start, so the section is obviously fillable rather
+         * than an isolated button. */
+        setPlanPoints(['']);
     });
 
     $(".save_plan_btn").click(async function () {
@@ -113,6 +116,7 @@
             'photo': image,
             'price': price,
             'expiryDay': expiryDay,
+            'plan_points': cleanedPlanPoints(),
             'isEnable': isEnable,
             'createdAt': firebase.firestore.FieldValue.serverTimestamp()
         });
