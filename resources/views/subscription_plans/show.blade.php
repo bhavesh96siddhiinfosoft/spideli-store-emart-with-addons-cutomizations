@@ -480,16 +480,17 @@
 
                                                 /* A subscription belongs to the store, not the
                                                  * account - a vendor with two stores subscribes
-                                                 * each one separately. The vendors document has
-                                                 * carried these fields all along; the check used
-                                                 * to read the owner's copy, which meant one
-                                                 * subscribed store made every store look
-                                                 * subscribed. */
-                                                var selectedStore = await resolveCurrentStore(userId);
-                                                var storeSubscriptionId = (selectedStore && selectedStore.subscriptionPlanId)
-                                                    ? selectedStore.subscriptionPlanId : '';
-
-                                                if (storeSubscriptionId != '' && storeSubscriptionId != null) {
+                                                 * each one separately, and reading the owner's
+                                                 * copy made one paid store carry them all.
+                                                 *
+                                                 * A vendor who has just signed up has NO store
+                                                 * yet - this screen is the first thing they see -
+                                                 * so the plan they have just bought is on the
+                                                 * account. storeIsSubscribed() falls back to it
+                                                 * when there is no store, which is what stops a
+                                                 * new vendor being sent back to this screen
+                                                 * straight after paying on it. */
+                                                if (await storeIsSubscribed(userId)) {
                                                     if (documentVerificationEnable && (!isDocumentVerified || userData.isDocumentVerify)) {                                                        
                                                         window.location = "{{ route('vendors.document') }}";
                                                     } else if(documentVerificationEnable && isAutoVerified){

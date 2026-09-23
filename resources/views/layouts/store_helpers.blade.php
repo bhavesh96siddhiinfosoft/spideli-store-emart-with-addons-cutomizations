@@ -201,8 +201,28 @@
             async function storeIsSubscribed(ownerUserId) {
                 const store = await resolveCurrentStore(ownerUserId);
 
+                /* No store yet.
+                 *
+                 * A vendor subscribes BEFORE they create a store - the plans
+                 * screen is the first thing they see after signing up - so the
+                 * plan they have just paid for is on the account and there is
+                 * nowhere else to look. Answering false here sent a vendor who
+                 * had just paid straight back to the plans screen.
+                 *
+                 * Once a store exists its own answer is the only one that
+                 * counts, which is what stops one paid store carrying the
+                 * others past the paywall. */
                 if (!store) {
-                    return false;
+                    try {
+                        const snapshot = await firebase.firestore()
+                            .collection('users').doc(ownerUserId).get();
+                        const accountPlanId = snapshot.exists ? snapshot.data().subscriptionPlanId : '';
+
+                        return accountPlanId !== undefined && accountPlanId !== null && accountPlanId !== '';
+                    } catch (err) {
+                        console.error("Could not read the account subscription:", err);
+                        return false;
+                    }
                 }
 
                 const planId = store.subscriptionPlanId;

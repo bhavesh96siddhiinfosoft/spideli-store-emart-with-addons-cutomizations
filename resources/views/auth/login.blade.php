@@ -350,11 +350,21 @@
                     const stores = await database.collection('vendors')
                         .where('author', '==', ownerUserId).get();
 
+                    const userSnapshot = await database.collection('users').doc(ownerUserId).get();
+
+                    /* No store yet. A vendor subscribes before they create one,
+                     * so the plan they paid for is on the account and there is
+                     * nowhere else to look. Answering false here sent a vendor
+                     * who had already paid back to the plans screen every time
+                     * they signed in. Matches storeIsSubscribed() in
+                     * layouts/store_helpers.blade.php - keep the two in step. */
                     if (stores.empty) {
-                        return false;
+                        const accountPlanId = userSnapshot.exists
+                            ? userSnapshot.data().subscriptionPlanId : '';
+
+                        return accountPlanId !== undefined && accountPlanId !== null && accountPlanId !== '';
                     }
 
-                    const userSnapshot = await database.collection('users').doc(ownerUserId).get();
                     const selectedId = userSnapshot.exists ? (userSnapshot.data().vendorID || '') : '';
 
                     let store = stores.docs[0].data();
