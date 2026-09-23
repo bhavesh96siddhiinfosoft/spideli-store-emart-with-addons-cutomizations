@@ -88,6 +88,10 @@
         <script type="text/javascript" src="{{ asset('assets/plugins/slick/slick.min.js') }}"></script>
         <script type="text/javascript" src="{{ asset('assets/plugins/slick/slick-lightbox.js') }}"></script>
 
+        {{-- This page renders its own <html>, so it gets nothing from
+             layouts/app.blade.php. The store helpers it calls live here. --}}
+        @include('layouts.store_helpers')
+
         <script type="text/javascript">
             var database = firebase.firestore();
             var currentCurrency = '';
@@ -185,8 +189,38 @@
 
             async function getUserInfo() {
 
-                await database.collection('users').where('id', '==', userId).get().then(async function(snapshot) {
-                    var userData = snapshot.docs[0].data();
+                /* Read by DOCUMENT id first.
+                 *
+                 * This asked for the record whose `id` FIELD matches, which most
+                 * of the panel does not rely on - `users.doc(userId)` is used
+                 * elsewhere on these same screens. A record written without that
+                 * field, which a newly registered vendor can be, is invisible to
+                 * the field query and the page stopped dead on it.
+                 *
+                 * The field query is kept as a fallback, for any record whose
+                 * document id is not the sign-in id. */
+                var userDoc = await database.collection('users').doc(userId).get();
+                var userData = userDoc.exists ? userDoc.data() : null;
+
+                if (userData === null) {
+                    var byField = await database.collection('users').where('id', '==', userId).get();
+
+                    if (!byField.empty) {
+                        userData = byField.docs[0].data();
+                    }
+                }
+
+                /* Both reads came back empty, so this account no longer exists -
+                 * an admin has deleted it while the session was still open.
+                 * There is nothing to show them, so they are signed out. */
+                if (userData === null) {
+                    console.warn("No user record for", userId, "- signing out.");
+                    jQuery('#data-table_processing').hide();
+                    signOutMissingUser();
+                    return;
+                }
+
+                await (async function(userData) {
 
                     if (userData.hasOwnProperty('sectionId') && userData.sectionId != '' && userData.sectionId !=
                         null) {
@@ -224,7 +258,7 @@
                         })
                     }
 
-                });
+                })(userData);
 
             }
 

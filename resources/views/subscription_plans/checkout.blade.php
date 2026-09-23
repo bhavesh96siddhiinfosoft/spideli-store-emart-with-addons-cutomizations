@@ -316,6 +316,10 @@
     <script src="{{ asset('js/jquery.cookie.js') }}"></script>
     <script src="{{ asset('js/jquery.validate.js') }}"></script>
 
+    {{-- This page renders its own <html>, so it gets nothing from
+         layouts/app.blade.php. The store helpers it calls live here. --}}
+    @include('layouts.store_helpers')
+
     <script type="text/javascript">
     
         jQuery('#data-table_processing').show();

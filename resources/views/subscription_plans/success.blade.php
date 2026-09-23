@@ -160,6 +160,10 @@
         <script src="{{ asset('js/crypto-js.js') }}"></script>
         <script src="{{ asset('js/jquery.cookie.js') }}"></script>
         <script src="{{ asset('js/jquery.validate.js') }}"></script>
+        {{-- This page renders its own <html>, so it gets nothing from
+             layouts/app.blade.php. The store helpers it calls live here. --}}
+        @include('layouts.store_helpers')
+
         <script type="text/javascript">
             var database=firebase.firestore();
             var id_order=database.collection('tmp').doc().id;

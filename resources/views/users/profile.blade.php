@@ -1311,11 +1311,24 @@
                         'longitude': location.longitude
                     });
                 });
+                /* A zone may serve several regions - `regionIds` is the list.
+                 * The older single `regionId` names only the region the zone was
+                 * created under, so reading it alone hid every shared zone. */
+                var regionIds = [];
+
+                if (Array.isArray(data.regionIds)) {
+                    regionIds = data.regionIds.filter(function(value) {
+                        return value;
+                    });
+                } else if (data.regionId) {
+                    regionIds = [data.regionId];
+                }
+
                 zoneList.push({
                     'id': data.id,
                     'name': data.name,
                     'area': area,
-                    'regionId': data.regionId ? data.regionId : ''
+                    'regionIds': regionIds
                 });
             });
 
@@ -1323,12 +1336,11 @@
             renderZones();
         }
 
-        /* A zone belongs to exactly one region, so the picker only offers the
-         * zones of the region on screen - otherwise a store could save a region
-         * and a zone that name different countries, and the two would disagree
-         * wherever the admin filters by region.
+        /* The picker offers the zones that serve the region on screen. A zone
+         * may serve several, so it is offered when the chosen region is among
+         * its regions - not only when it is the one the zone was created under.
          *
-         * Zones no region has claimed yet carry no regionId. Those are offered
+         * Zones no region has claimed yet carry none at all. Those are offered
          * under every region rather than hidden, so a store is never left with
          * nothing to pick while regions are still being filled in. */
         function renderZones() {
@@ -1343,7 +1355,7 @@
                 .text("{{ trans('lang.select_zone') }}"));
 
             zoneList.forEach(function(zone) {
-                if (regionId != '' && zone.regionId != '' && zone.regionId != regionId) {
+                if (regionId != '' && zone.regionIds.length > 0 && zone.regionIds.indexOf(regionId) === -1) {
                     return;
                 }
                 $('#zone').append($("<option></option>")

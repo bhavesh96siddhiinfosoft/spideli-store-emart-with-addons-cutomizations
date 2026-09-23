@@ -127,7 +127,20 @@
     });  
     var newLi = '';
     database.collection('users').doc(vendorUserId).get().then(async function(usersnapshots) {
-        
+
+        /* An admin can delete a vendor while they are still signed in here - the
+         * session lives in this site's own database and survives it. Every
+         * screen then fails on a record that is not there, starting with the
+         * line below. They are signed out instead.
+         *
+         * The menu is on every panel page, so this is the one place that catches
+         * it everywhere. */
+        if (!usersnapshots.exists) {
+            console.warn("No user record for", vendorUserId, "- signing out.");
+            signOutMissingUser();
+            return;
+        }
+
         var userData = usersnapshots.data();
         var checkVendor = null;
         var username = userData.firstName + ' ' + userData.lastName;
@@ -533,6 +546,21 @@
          * the paywall reads corrects itself as soon as a vendor moves between
          * stores. */
         if (commisionModel || subscriptionModel) {
+            /* This file is included at the top of the layout, and
+             * storeIsSubscribed() is defined in a script block further down it.
+             * This runs inside a Firestore callback, which usually resolves long
+             * after the page has parsed - but when the answer is already cached
+             * it can resolve within the handful of script tags between jQuery
+             * and that block, and the helper does not exist yet.
+             *
+             * Waiting for the document to finish parsing removes the race: by
+             * then every script tag on the page has run. */
+            if (document.readyState === 'loading') {
+                await new Promise(function (resolve) {
+                    document.addEventListener('DOMContentLoaded', resolve, { once: true });
+                });
+            }
+
             var isSubscribed = await storeIsSubscribed(vendorUserId);
         } else {
             var isSubscribed = '';
