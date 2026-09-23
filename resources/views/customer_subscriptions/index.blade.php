@@ -60,6 +60,7 @@
                                     <thead>
                                         <tr>
                                             <th>{{ trans('lang.plan_title') }}</th>
+                                            <th>{{ trans('lang.store_info') }}</th>
                                             <th>{{ trans('lang.plan_price') }}</th>
                                             <th>{{ trans('lang.plan_period') }}</th>
                                             <th>{{ trans('lang.plan_subscriber_count') }}</th>
@@ -86,6 +87,7 @@
     var authRole = "{{ $authRole }}";
     var empVendorId = "{{ $empVendorId }}";
     var vendorID = '';
+    var vendorTitle = '';
 
     var currentCurrency = '';
     var currencyAtRight = false;
@@ -113,6 +115,10 @@
             return;
         }
         vendorID = vendor.id;
+        /* These plans belong to the store the panel is working on, so every row
+         * carries the same name. It is there so a vendor who owns several stores
+         * can see at a glance which one's plans they are looking at. */
+        vendorTitle = vendor.title || '';
 
         await loadPlans();
 
@@ -144,6 +150,7 @@
 
             rows.push([
                 plan.title || '',
+                vendorTitle,
                 formatPrice(plan.price),
                 periodLabel(plan.expiryDay),
                 subscribers.size,
@@ -161,7 +168,7 @@
             pageLength: 10,
             responsive: true,
             order: [[0, 'asc']],
-            columnDefs: [{ orderable: false, targets: 5 }],
+            columnDefs: [{ orderable: false, targets: [1, 6] }],
             language: {
                 emptyTable: "{{ trans('lang.no_plans_yet') }}"
             }
