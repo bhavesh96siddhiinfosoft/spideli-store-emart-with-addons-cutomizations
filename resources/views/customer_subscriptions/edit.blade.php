@@ -82,18 +82,25 @@
             $(".plan_image_preview").show();
         }
 
+        await loadPlanStores(vendorUserId, plan.vendorID || '');
+
         jQuery("#data-table_processing").hide();
     });
 
     $(".save_plan_btn").click(async function () {
         $(".error_top").hide();
 
+        var storeId = $("#plan_store").val();
         var title = $(".plan_title").val();
         var price = $(".plan_price").val();
         var expiryDay = $(".plan_period").val();
         var description = $(".plan_description").val();
         var isEnable = $(".plan_enabled").is(":checked");
 
+        if (!storeId) {
+            showError("{{ trans('lang.select_plan_store_error') }}");
+            return;
+        }
         if (title == '') {
             showError("{{ trans('lang.enter_plan_title_error') }}");
             return;
@@ -107,11 +114,18 @@
 
         var image = await storePlanImage();
 
-        /* Only the fields on this form are written. vendorID, regionId and
-         * sectionId stay as they were set at creation - a plan does not change
-         * hands. Existing subscribers are unaffected either way: they hold a
-         * snapshot of the plan as it was when they paid. */
+        /* The store is now on the form, so a plan can be moved between the
+         * vendor's own stores. Its region and section follow the store, or the
+         * plan would be invisible to a region-filtered admin after the move.
+         *
+         * Existing subscribers are unaffected: they hold a snapshot of the plan
+         * as it was when they paid. */
+        var store = planStoresById[storeId];
+
         await database.collection('vendor_subscription_plans').doc(planId).update({
+            'vendorID': storeId,
+            'regionId': (store && store.regionId) ? store.regionId : '',
+            'sectionId': (store && store.section_id) ? store.section_id : '',
             'title': title,
             'description': description,
             'photo': image,

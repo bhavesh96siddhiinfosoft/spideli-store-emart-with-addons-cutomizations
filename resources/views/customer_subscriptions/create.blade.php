@@ -54,6 +54,7 @@
 
     document.addEventListener("DOMContentLoaded", async function () {
         await employeeMayView();
+        await loadPlanStores(vendorUserId, '');
     });
 
     $(".save_plan_btn").click(async function () {
@@ -63,12 +64,17 @@
             return;
         }
 
+        var storeId = $("#plan_store").val();
         var title = $(".plan_title").val();
         var price = $(".plan_price").val();
         var expiryDay = $(".plan_period").val();
         var description = $(".plan_description").val();
         var isEnable = $(".plan_enabled").is(":checked");
 
+        if (!storeId) {
+            showError("{{ trans('lang.select_plan_store_error') }}");
+            return;
+        }
         if (title == '') {
             showError("{{ trans('lang.enter_plan_title_error') }}");
             return;
@@ -80,7 +86,10 @@
 
         jQuery("#data-table_processing").show();
 
-        var vendor = await loadVendorRecord();
+        /* The store chosen on the form, not whichever one the panel happens to
+         * be working on - a vendor may hold several in this region. */
+        var vendor = planStoresById[storeId];
+
         if (vendor == null) {
             jQuery("#data-table_processing").hide();
             showError("{{ trans('lang.vendor_record_not_found') }}");
