@@ -1086,6 +1086,8 @@ return [
     'wholesale_price_help' => 'Price per unit once the minimum quantity is reached. Must be lower than the item price.',
     'wholesale_min_qty' => 'Minimum Quantity',
     'wholesale_min_qty_help' => 'Units a customer must buy before the wholesale price applies. At least 2.',
+    'wholesale_details' => 'Wholesale Details',
+    'wholesale_details_help' => 'Anything a wholesale buyer should know - a price table, minimum order terms, packaging or delivery notes. Shown with the product.',
     'variant_wholesale_price' => 'Wholesale Price',
     'wholesale' => 'Wholesale',
     'enter_wholesale_price_error' => 'Please enter a wholesale price',

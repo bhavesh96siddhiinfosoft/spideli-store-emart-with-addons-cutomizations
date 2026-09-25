@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
+    {{-- The layout's @yield('style') is commented out, so the editor's stylesheet
+         is linked here. Only these two screens use it, so it is not worth putting
+         in the layout for every page to load. --}}
+    <link href="{{ asset('assets/plugins/summernote/summernote-bs4.css') }}" rel="stylesheet">
     <div class="page-wrapper">
         <div class="row page-titles">
 
@@ -112,6 +116,20 @@
                                         <input type="number" class="form-control wholesale_min_qty" min="2">
                                         <div class="form-text text-muted">
                                             {{ trans('lang.wholesale_min_qty_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Same shape as the Description field below, so the two boxes
+                                     line up at the same width. --}}
+                                <div class="form-group row width-100">
+                                    <div class="col-12">
+                                        <label class="control-label">{{ trans('lang.wholesale_details') }}</label>
+                                        <div class="col-7 outline-wrapper">
+                                            <textarea id="wholesale_details"></textarea>
+                                            <div class="form-text text-muted">
+                                                {{ trans('lang.wholesale_details_help') }}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -449,6 +467,7 @@
 @endsection
 
 @section('scripts')
+    <script src="{{ asset('assets/plugins/summernote/summernote-bs4.js') }}"></script>
     @if (isset($openai_settings) && data_get($openai_settings, 'status') == true)
         <link href="{{ asset('css/AI/ai-sidebar.css') }}" rel="stylesheet">
         <script src="{{ asset('js/AI/product-details-autofill.js') }}"></script>
@@ -529,6 +548,11 @@
 
         });
         $(document).ready(async function() {   
+            /* Built here, not only from variants_update() - that runs when the
+             * variant table is rebuilt, which on a new product never happens, so
+             * the editor was never created and the plain textarea showed. */
+            initWholesaleEditor();
+
             if (authRole === 'employee') {               
                 const perm = await getEmployeePermissionForTitle(vendorUserId, "Manage Products");
                 currentPermissions = {
@@ -1032,6 +1056,10 @@
                                         'wholesaleEnabled': wholesaleEnabled,
                                         'wholesalePrice': wholesaleEnabled ? wholesalePrice : '',
                                         'wholesaleMinQty': wholesaleEnabled ? wholesaleMinQty : '',
+                                        /* Cleared with the toggle, like the price and quantity, so a
+                                         * product no longer sold wholesale does not keep notes
+                                         * about it. */
+                                        'wholesaleDetails': wholesaleEnabled ? wholesaleDetailsValue() : '',
                                         'vendorID': (authRole === 'vendor') ? vandorId : empVendorId,
                                         'categoryID': category,
                                         'brandID': brand,
@@ -1326,6 +1354,53 @@
         /* The wholesale column is always drawn and shown or hidden with the
          * toggle, so a price already typed into it survives being switched off
          * and on again. */
+
+        /* The wholesale notes editor.
+         *
+         * Same toolbar as the Terms and Conditions editor in the admin panel, so
+         * the two look alike. It lives inside `.wholesale_fields`, which is shown
+         * and hidden by the toggle above, so it needs no visibility handling of
+         * its own.
+         *
+         * Built once on ready rather than each time the toggle is switched on -
+         * rebuilding it would throw away whatever the vendor had typed. */
+        function initWholesaleEditor() {
+            if (!$('#wholesale_details').length || $('#wholesale_details').next('.note-editor').length) {
+                return;
+            }
+
+            $('#wholesale_details').summernote({
+                /* Matches the Description box below it - that is rows="8", which
+                 * comes out around 200px. */
+                height: 200,
+                width: '100%',
+                toolbar: [
+                    ['style', ['bold', 'italic', 'underline', 'clear']],
+                    ['font', ['strikethrough', 'superscript', 'subscript']],
+                    ['fontsize', ['fontsize']],
+                    ['color', ['color']],
+                    ['forecolor', ['forecolor']],
+                    ['backcolor', ['backcolor']],
+                    ['para', ['ul', 'ol', 'paragraph']],
+                    ['table', ['table']],
+                    ['height', ['height']],
+                    ['view', ['fullscreen', 'codeview', 'help']]
+                ]
+            });
+        }
+
+        /* Empty when the vendor has typed nothing - summernote leaves an empty
+         * paragraph behind, which would otherwise be stored as content. */
+        function wholesaleDetailsValue() {
+            if (!$('#wholesale_details').length) {
+                return '';
+            }
+
+            var html = $('#wholesale_details').summernote('code');
+
+            return $('<div>').html(html).text().trim() === '' ? '' : html;
+        }
+
         function applyWholesaleVisibility() {
             if ($('#wholesale_enabled').is(':checked')) {
                 $('.wholesale_fields').show();
@@ -1425,6 +1500,7 @@
                 }
             }
             $("#item_variants").html(html);
+            initWholesaleEditor();
             applyWholesaleVisibility();
         }
 
