@@ -98,23 +98,33 @@
                                 </div>
 
                                 <div class="wholesale_fields" style="display:none;">
+                                    {{-- Retail / wholesale / both, as the store app writes it. With wholesale
+                                         switched off the product is retail whatever is chosen here, so the
+                                         value is only read from this dropdown while wholesale is on. --}}
                                     <div class="form-group row width-50">
-                                        <label class="col-3 control-label">{{ trans('lang.wholesale_price') }}</label>
+                                        <label class="col-3 control-label">{{ trans('lang.sale_type') }}</label>
                                         <div class="col-7">
-                                            <input type="number" class="form-control wholesale_price" min="0">
-                                            <div class="form-text text-muted">
-                                                {{ trans('lang.wholesale_price_help') }}
+                                            <div class="custom-dropdown">
+                                                <select class="form-control sale_type" id="sale_type">
+                                                    <option value="retail">{{ trans('lang.sale_type_retail') }}</option>
+                                                    <option value="both" selected>{{ trans('lang.sale_type_both') }}</option>
+                                                    <option value="wholesale">{{ trans('lang.sale_type_wholesale') }}</option>
+                                                </select>
                                             </div>
+                                            <div class="form-text text-muted">{{ trans('lang.sale_type_help') }}</div>
                                         </div>
                                     </div>
 
-                                    <div class="form-group row width-50">
-                                        <label class="col-3 control-label">{{ trans('lang.wholesale_min_qty') }}</label>
-                                        <div class="col-7">
-                                            <input type="number" class="form-control wholesale_min_qty" min="2">
-                                            <div class="form-text text-muted">
-                                                {{ trans('lang.wholesale_min_qty_help') }}
-                                            </div>
+                                    {{-- One list, tier one included. The store app shows the same thing, and
+                                         its `wholesaleTiers` array is the shape both sides write. The legacy
+                                         `wholesalePrice` + `wholesaleMinQty` pair is still saved, taken from
+                                         tier one, because the website prices from it. --}}
+                                    <div class="form-group row width-100">
+                                        <div class="col-12">
+                                            <label class="control-label">{{ trans('lang.wholesale_tiers') }}</label>
+                                            <div id="wholesale_tiers"></div>
+                                            <button type="button" class="btn btn-primary mt-2" id="add_wholesale_tier">{{ trans('lang.add_tier') }}</button>
+                                            <div class="form-text text-muted">{{ trans('lang.wholesale_tiers_help') }}</div>
                                         </div>
                                     </div>
 
@@ -267,6 +277,7 @@
                                 <div class="form-check width-100 food_delivery_take_away d-none">
                                     <input type="checkbox" class="item_take_away_option" id="item_take_away_option">
                                     <label class="col-3 control-label" for="item_take_away_option">{{ trans('lang.item_take_away') }}</label>
+                                    <div class="form-text text-muted">{{ trans('lang.item_take_away_help') }}</div>
                                 </div>
 
                             </fieldset>
@@ -839,8 +850,6 @@
                 if (product.wholesaleEnabled === true) {
                     $("#wholesale_enabled").prop('checked', true);
                     $('.wholesale_fields').show();
-                    $(".wholesale_price").val(product.wholesalePrice);
-                    $(".wholesale_min_qty").val(product.wholesaleMinQty);
                 }
 
                 /* Set through summernote rather than on the textarea - the
@@ -848,9 +857,23 @@
                  * textarea would not show. Set whether or not wholesale is on,
                  * so switching it back on does not appear to have lost the
                  * notes. */
+                setWholesaleTiers(product.wholesaleTiers, product.wholesalePrice, product.wholesaleMinQty);
+
+                /* Products saved before this field existed fall back to both. */
+                $('#sale_type').val(
+                    ['retail', 'wholesale', 'both'].indexOf(product.saleType) !== -1
+                        ? product.saleType : 'both');
+
                 if (product.wholesaleDetails) {
                     initWholesaleEditor();
-                    $('#wholesale_details').summernote('code', product.wholesaleDetails);
+
+                    if ($('#wholesale_details').siblings('.note-editor').length) {
+                        $('#wholesale_details').summernote('code', product.wholesaleDetails);
+                    } else {
+                        /* Editor could not be built - keep the saved notes in the
+                         * textarea so they are shown and saved back unchanged. */
+                        $('#wholesale_details').val(product.wholesaleDetails);
+                    }
                 }
 
                 $(".item_featured").val();
@@ -941,8 +964,14 @@
                 var itemTakeaway = $(".item_take_away_option").is(":checked");
                 var is_digital_product = $("#is_digital_product").is(":checked");
                 var wholesaleEnabled = $("#wholesale_enabled").is(":checked");
-                var wholesalePrice = $(".wholesale_price").val();
-                var wholesaleMinQty = $(".wholesale_min_qty").val();
+                /* Tier one. The website reads these two, so they are still
+                 * written - taken from the list rather than their own fields. */
+                var savedTiers = wholesaleTiersValue();
+                    /* The store app's three-way value. Wholesale off means retail,
+                     * so the dropdown only ever chooses between the other two. */
+                    var saleType = wholesaleEnabled ? ($('#sale_type').val() || 'both') : 'retail';
+                var wholesalePrice = savedTiers.length ? savedTiers[0].price : '';
+                var wholesaleMinQty = savedTiers.length ? savedTiers[0].minQty : '';
                 let selectedTaxes = [];
                 $('#taxes option:selected').each(function() {
                     let taxData = $(this).attr('data-tax');
@@ -1013,23 +1042,15 @@
                     $(".error_top").html("");
                     $(".error_top").append("<p>{{ trans('lang.select_brand_error') }}</p>");
                     window.scrollTo(0, 0);
-                } else if (wholesaleEnabled && (wholesalePrice == '' || parseFloat(wholesalePrice) <= 0)) {
-                    jQuery("#data-table_processing").hide();
+                /* One check for every tier, base included - quantities rising,
+                 * prices falling, each below the retail price. Replaces three
+                 * separate checks that only knew about the base pair. */
+                } else if (wholesaleEnabled && wholesaleTiersError(price) !== '') {
                     $(".error_top").show();
                     $(".error_top").html("");
-                    $(".error_top").append("<p>{{ trans('lang.wholesale_price_positive_error') }}</p>");
-                    window.scrollTo(0, 0);
-                } else if (wholesaleEnabled && parseFloat(wholesalePrice) >= parseFloat(price)) {
-                    jQuery("#data-table_processing").hide();
-                    $(".error_top").show();
-                    $(".error_top").html("");
-                    $(".error_top").append("<p>{{ trans('lang.wholesale_price_less_than_price_error') }}</p>");
-                    window.scrollTo(0, 0);
-                } else if (wholesaleEnabled && (wholesaleMinQty == '' || parseInt(wholesaleMinQty) < 2)) {
-                    jQuery("#data-table_processing").hide();
-                    $(".error_top").show();
-                    $(".error_top").html("");
-                    $(".error_top").append("<p>{{ trans('lang.wholesale_min_qty_error') }}</p>");
+                    $(".error_top").append(
+                        "<p>" + wholesaleTiersError(price) + "</p>"
+                    );
                     window.scrollTo(0, 0);
                 } else if (parseInt(price) < parseInt(discount)) {
                     jQuery("#data-table_processing").hide();
@@ -1144,12 +1165,18 @@
                                 'quantity': parseInt(item_quantity),
                                 'disPrice': discount,
                                 'wholesaleEnabled': wholesaleEnabled,
+                                'saleType': saleType,
                                 'wholesalePrice': wholesaleEnabled ? wholesalePrice : '',
                                 'wholesaleMinQty': wholesaleEnabled ? wholesaleMinQty : '',
                                 /* Cleared with the toggle, like the price and quantity, so a
                                  * product no longer sold wholesale does not keep notes
                                  * about it. */
                                 'wholesaleDetails': wholesaleEnabled ? wholesaleDetailsValue() : '',
+                                /* Written alongside the pair above, not instead of it. The
+                                 * store app reads this array; the website still reads the
+                                 * pair, which is tier one. */
+                                'wholesaleTiers': wholesaleEnabled
+                                    ? savedTiers : [],
                                 'categoryID': category,
                                 'brandID': brand,
                                 'photo': photo,
@@ -1553,6 +1580,238 @@
          * toggle, so a price already typed into it survives being switched off
          * and on again. */
 
+
+        /* ---- Wholesale price tiers ----
+         *
+         * Shape comes from the store app: `wholesaleTiers: [{minQty, price}]`,
+         * at most five, sorted by quantity. Tier one is in this list like any
+         * other row - the separate Wholesale Price and Minimum Quantity fields
+         * are gone, so a vendor sees the same thing here as in the app.
+         *
+         * The legacy `wholesalePrice` + `wholesaleMinQty` pair is still written
+         * from tier one, because the website prices from it and knows nothing
+         * about the array.
+         *
+         * The array is the truth and the inputs are redrawn from it, so removing
+         * a middle row cannot leave the rest holding stale positions. */
+        var wholesaleTiers = [];
+        var MAX_WHOLESALE_TIERS = 5;
+
+        function renderWholesaleTiers() {
+            var container = document.getElementById('wholesale_tiers');
+
+            if (!container) {
+                return;
+            }
+
+            container.innerHTML = '';
+
+            if (wholesaleTiers.length === 0) {
+                $('#add_wholesale_tier').prop('disabled', false);
+                return;
+            }
+
+            /* A heading row above the list rather than a label per row, which
+             * would repeat five times. The spacers keep it lined up with the
+             * number badge and the remove button. */
+            var head = document.createElement('div');
+            head.className = 'd-flex align-items-center';
+
+            var headNumber = document.createElement('span');
+            headNumber.className = 'badge mr-2';
+            headNumber.style.visibility = 'hidden';
+            headNumber.textContent = '0';
+
+            var headQty = document.createElement('label');
+            headQty.className = 'control-label mr-2 mb-1';
+            headQty.style.flex = '1 1 0';
+            headQty.textContent = "{{ trans('lang.tier_from_quantity') }}";
+
+            var headPrice = document.createElement('label');
+            headPrice.className = 'control-label mr-2 mb-1';
+            headPrice.style.flex = '1 1 0';
+            headPrice.textContent = "{{ trans('lang.tier_unit_price') }}";
+
+            var headRemove = document.createElement('span');
+            headRemove.style.visibility = 'hidden';
+            headRemove.className = 'btn btn-danger';
+            headRemove.innerHTML = '<i class="mdi mdi-delete"></i>';
+
+            head.appendChild(headNumber);
+            head.appendChild(headQty);
+            head.appendChild(headPrice);
+            head.appendChild(headRemove);
+            container.appendChild(head);
+
+            wholesaleTiers.forEach(function (tier, index) {
+                var row = document.createElement('div');
+                row.className = 'form-group d-flex align-items-center mt-1';
+
+                var number = document.createElement('span');
+                number.className = 'badge badge-primary mr-2';
+                number.textContent = index + 1;
+
+                var qty = document.createElement('input');
+                qty.type = 'number';
+                qty.min = '2';
+                qty.className = 'form-control mr-2';
+                qty.style.flex = '1 1 0';
+                qty.placeholder = "0";
+                qty.value = tier.minQty;
+                qty.addEventListener('input', function () {
+                    wholesaleTiers[index].minQty = this.value;
+                });
+
+                var price = document.createElement('input');
+                price.type = 'number';
+                price.min = '0';
+                price.className = 'form-control mr-2';
+                price.style.flex = '1 1 0';
+                price.placeholder = "0";
+                price.value = tier.price;
+                price.addEventListener('input', function () {
+                    wholesaleTiers[index].price = this.value;
+                });
+
+                row.appendChild(number);
+                row.appendChild(qty);
+                row.appendChild(price);
+
+                /* Tier one is the base every other tier is measured against, and
+                 * the website reads it, so it cannot be removed while wholesale
+                 * is switched on. Unticking wholesale clears the lot.
+                 *
+                 * It still gets an invisible button in that slot, or its two
+                 * inputs would be wider than every row below it. */
+                var remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'btn btn-danger';
+                remove.innerHTML = '<i class="mdi mdi-delete"></i>';
+
+                if (index === 0) {
+                    remove.style.visibility = 'hidden';
+                    remove.disabled = true;
+                } else {
+                    remove.addEventListener('click', function () {
+                        wholesaleTiers.splice(index, 1);
+                        renderWholesaleTiers();
+                    });
+                }
+
+                row.appendChild(remove);
+                container.appendChild(row);
+            });
+
+            $('#add_wholesale_tier').prop('disabled', wholesaleTiers.length >= MAX_WHOLESALE_TIERS);
+        }
+
+        /* Switching wholesale on with nothing there gives tier one straight away,
+         * so a vendor is never looking at an empty section wondering where to
+         * type. */
+        function ensureFirstWholesaleTier() {
+            if (wholesaleTiers.length === 0) {
+                wholesaleTiers.push({ minQty: '', price: '' });
+            }
+
+            renderWholesaleTiers();
+        }
+
+        $(document).on('click', '#add_wholesale_tier', function () {
+            if (wholesaleTiers.length >= MAX_WHOLESALE_TIERS) {
+                return;
+            }
+
+            wholesaleTiers.push({ minQty: '', price: '' });
+            renderWholesaleTiers();
+        });
+
+        /* Every tier, sorted, with rows left entirely blank dropped - adding a
+         * row and changing your mind should not stop the product saving. */
+        function wholesaleTiersValue() {
+            var tiers = [];
+
+            wholesaleTiers.forEach(function (tier) {
+                if (String(tier.minQty).trim() === '' && String(tier.price).trim() === '') {
+                    return;
+                }
+
+                tiers.push({
+                    'minQty': parseInt(tier.minQty),
+                    'price': parseFloat(tier.price)
+                });
+            });
+
+            tiers.sort(function (a, b) {
+                return a.minQty - b.minQty;
+            });
+
+            return tiers;
+        }
+
+        /* The app's rules: quantities strictly increasing, prices strictly
+         * decreasing, every quantity at least 2, every price below the retail
+         * price. Returns an error message, or '' when the tiers are sound. */
+        function wholesaleTiersError(retailPrice) {
+            var tiers = wholesaleTiersValue();
+
+            if (tiers.length === 0) {
+                return "{{ trans('lang.wholesale_tier_required_error') }}";
+            }
+
+            if (tiers.length > MAX_WHOLESALE_TIERS) {
+                return "{{ trans('lang.wholesale_tier_max_error') }}";
+            }
+
+            for (var i = 0; i < tiers.length; i++) {
+                if (isNaN(tiers[i].minQty) || tiers[i].minQty < 2) {
+                    return "{{ trans('lang.wholesale_min_qty_error') }}";
+                }
+
+                if (isNaN(tiers[i].price) || tiers[i].price <= 0) {
+                    return "{{ trans('lang.wholesale_price_positive_error') }}";
+                }
+
+                if (tiers[i].price >= parseFloat(retailPrice)) {
+                    return "{{ trans('lang.wholesale_price_less_than_price_error') }}";
+                }
+
+                if (i > 0) {
+                    if (tiers[i].minQty <= tiers[i - 1].minQty) {
+                        return "{{ trans('lang.wholesale_tier_qty_order_error') }}";
+                    }
+
+                    if (tiers[i].price >= tiers[i - 1].price) {
+                        return "{{ trans('lang.wholesale_tier_price_order_error') }}";
+                    }
+                }
+            }
+
+            return '';
+        }
+
+        /* Editing. A product saved by the store app carries the array; one saved
+         * by this panel before tiers existed carries only the old pair, which
+         * becomes tier one. */
+        function setWholesaleTiers(tiers, legacyPrice, legacyMinQty) {
+            wholesaleTiers = [];
+
+            if (Array.isArray(tiers) && tiers.length > 0) {
+                tiers.forEach(function (tier) {
+                    wholesaleTiers.push({
+                        minQty: tier.minQty !== undefined ? tier.minQty : '',
+                        price: tier.price !== undefined ? tier.price : ''
+                    });
+                });
+            } else if (legacyPrice || legacyMinQty) {
+                wholesaleTiers.push({
+                    minQty: legacyMinQty !== undefined ? legacyMinQty : '',
+                    price: legacyPrice !== undefined ? legacyPrice : ''
+                });
+            }
+
+            renderWholesaleTiers();
+        }
+
         /* The wholesale notes editor.
          *
          * Same toolbar as the Terms and Conditions editor in the admin panel, so
@@ -1563,7 +1822,18 @@
          * Built once on ready rather than each time the toggle is switched on -
          * rebuilding it would throw away whatever the vendor had typed. */
         function initWholesaleEditor() {
-            if (!$('#wholesale_details').length || $('#wholesale_details').next('.note-editor').length) {
+            /* Nothing to build, or summernote already built it. Looks for the
+             * editor anywhere beside the textarea rather than strictly next to
+             * it, so the check does not depend on where summernote inserts. */
+            if (!$('#wholesale_details').length || $('#wholesale_details').siblings('.note-editor').length) {
+                return;
+            }
+
+            /* The script tag is at the top of this section, so this should never
+             * happen - but a failed asset would otherwise throw here and take
+             * the rest of the caller down with it. */
+            if (typeof $.fn.summernote !== 'function') {
+                console.error('summernote did not load - the wholesale notes editor cannot be built');
                 return;
             }
 
@@ -1594,6 +1864,12 @@
                 return '';
             }
 
+            /* Read the plain textarea when the editor was never built, so a save
+             * still works rather than throwing on a missing summernote. */
+            if (!$('#wholesale_details').siblings('.note-editor').length) {
+                return $('#wholesale_details').val().trim();
+            }
+
             var html = $('#wholesale_details').summernote('code');
 
             return $('<div>').html(html).text().trim() === '' ? '' : html;
@@ -1603,6 +1879,15 @@
             if ($('#wholesale_enabled').is(':checked')) {
                 $('.wholesale_fields').show();
                 $('.wholesale_column').show();
+                /* Built here as well as on ready, and deliberately AFTER show().
+                 * Summernote measures the textarea when it is created, so
+                 * building it while `.wholesale_fields` is still display:none
+                 * left a collapsed box; and if anything earlier in the ready
+                 * queue throws, the ready call never happens at all. The guard
+                 * inside makes the second call a no-op, so nothing typed is
+                 * lost. */
+                initWholesaleEditor();
+                ensureFirstWholesaleTier();
             } else {
                 $('.wholesale_fields').hide();
                 $('.wholesale_column').hide();
