@@ -128,6 +128,30 @@
     /* A store has a handful of plans, so they are fetched once and paged in the
      * browser rather than through the server-side machinery the larger lists
      * use. */
+    /* A subscription counts as live when it has not been cancelled and its
+     * expiry date has not passed. No expiry date at all means a plan that
+     * never expires, which is live - not one that is missing a date. */
+    function isLiveSubscription(subscription) {
+        if ((subscription.status || 'active') === 'cancelled') {
+            return false;
+        }
+
+        var expiry = subscription.expiryDate;
+        if (!expiry) {
+            return true;
+        }
+
+        var expiryDate = (typeof expiry.toDate === 'function')
+            ? expiry.toDate()
+            : new Date(expiry);
+
+        if (isNaN(expiryDate.getTime())) {
+            return true;
+        }
+
+        return expiryDate.getTime() >= Date.now();
+    }
+
     async function loadPlans() {
         var snapshots = await database.collection('vendor_subscription_plans')
             .where('vendorID', '==', vendorID).get();
@@ -138,10 +162,23 @@
         await Promise.all(snapshots.docs.map(async function (doc) {
             var plan = doc.data();
 
+            /* Counted by DATE, not by the status field.
+             *
+             * `status` is written once when the customer subscribes and
+             * nothing ever changes it back, so counting on it included every
+             * subscriber who had ever bought the plan - the number could only
+             * grow. Every other screen already works out live-or-lapsed from
+             * expiryDate, and now this one does too.
+             *
+             * If a scheduled job is ever added to mark rows expired, this
+             * still holds: the date is the truth and the status follows it. */
             var subscribers = await database.collection('vendor_subscriptions')
                 .where('planId', '==', plan.id)
-                .where('status', '==', 'active')
                 .get();
+
+            var liveSubscribers = subscribers.docs.filter(function (subscriberDoc) {
+                return isLiveSubscription(subscriberDoc.data());
+            }).length;
 
             var actions = '<a class="btn btn-sm btn-outline-primary mr-1" href="' +
                 editUrlTemplate.replace(':id', plan.id) + '"><i class="mdi mdi-pencil"></i></a>' +
@@ -153,7 +190,7 @@
                 vendorTitle,
                 formatPrice(plan.price),
                 periodLabel(plan.expiryDay),
-                subscribers.size,
+                liveSubscribers,
                 plan.isEnable === true ?
                     '<span class="badge badge-success">{{ trans('lang.plan_enabled') }}</span>' :
                     '<span class="badge badge-danger">&mdash;</span>',
