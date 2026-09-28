@@ -675,9 +675,23 @@
 
                     if (wholesaleCandidates.length > 0) {
                         let label = "{{ trans('lang.wholesale_from_units') }}".replace(':count', data.wholesaleMinQty);
+                        /* Sold in packs - worth seeing on the card, before the
+                         * counter adds a line and finds it jump to ten. */
+                        let packMinimum = 0;
+                        if (String(data.saleType || '').toLowerCase() === 'wholesale') {
+                            packMinimum = Array.isArray(data.wholesaleTiers) && data.wholesaleTiers.length > 0
+                                ? parseInt(data.wholesaleTiers[0].minQty) || 0
+                                : parseInt(data.wholesaleMinQty) || 0;
+                        }
+                        let packLabel = packMinimum > 1
+                            ? ' <span class="badge badge-dark">' +
+                              "{{ trans('lang.wholesale_only_minimum') }}".replace(':count', packMinimum) +
+                              '</span>'
+                            : '';
+
                         wholesaleHtmlContent =
                             `<div class="shop-wholesale mb-2"><span class="badge badge-info">{{ trans('lang.wholesale') }} ` +
-                            `${formatPrice(Math.min(...wholesaleCandidates))} ${label}</span></div>`;
+                            `${formatPrice(Math.min(...wholesaleCandidates))} ${label}</span>${packLabel}</div>`;
                     }
                 }
 
@@ -751,6 +765,25 @@
         $('#modal_wholesale_line').show();
     }
 
+    /* The tier list off the product card, back as an array. Returns an empty
+     * list rather than throwing when a product has no wholesale pricing,
+     * which is the normal case. */
+    function readWholesaleTiers(productId) {
+        var raw = $('#wholesale_tiers_' + productId).val() || '';
+
+        if (raw === '') {
+            return [];
+        }
+
+        try {
+            var tiers = JSON.parse(decodeURIComponent(raw));
+            return Array.isArray(tiers) ? tiers : [];
+        } catch (e) {
+            console.error('wholesale tiers could not be read', e);
+            return [];
+        }
+    }
+
     function renderHiddenInputs(data, disPrice) {
         return `
             <input type="hidden" name="name_${data.id}" id="name_${data.id}" value="${data.name}">
@@ -769,6 +802,8 @@
             <input type="hidden" id="wholesale_enabled_${data.id}" value="${data.wholesaleEnabled === true ? '1' : '0'}">
             <input type="hidden" id="wholesale_price_${data.id}" value="${data.wholesalePrice || ''}">
             <input type="hidden" id="wholesale_min_qty_${data.id}" value="${data.wholesaleMinQty || ''}">
+            <input type="hidden" id="wholesale_tiers_${data.id}" value="${encodeURIComponent(JSON.stringify(data.wholesaleTiers || []))}">
+            <input type="hidden" id="sale_type_${data.id}" value="${data.saleType || 'both'}">
         `;
     }
 
@@ -1403,6 +1438,29 @@
             (variantWholesalePrice !== '' ? variantWholesalePrice : $('#wholesale_price_' + id).val()) : '';
         let wholesaleMinQty = wholesaleEnabled ? $('#wholesale_min_qty_' + id).val() : '';
 
+        /* The whole ladder, so the cart can price 100 units differently
+         * from 15 rather than only knowing the first break. Parsed here
+         * rather than posted as text, so it arrives as an array.
+         *
+         * A chosen variant has ONE wholesale price, not a ladder, so it
+         * replaces the list with itself at the entry quantity - the same
+         * resolution the website uses. */
+        let wholesaleTiers = [];
+        if (wholesaleEnabled) {
+            if (variantWholesalePrice !== '') {
+                if (wholesaleMinQty) {
+                    wholesaleTiers = [{
+                        minQty: parseInt(wholesaleMinQty) || 0,
+                        price: parseFloat(variantWholesalePrice)
+                    }];
+                }
+            } else {
+                wholesaleTiers = readWholesaleTiers(id);
+            }
+        }
+
+        let saleType = $('#sale_type_' + id).val() || 'both';
+
         let selectedAddons = [];
         let selectedAddonsTotal = 0;
 
@@ -1449,6 +1507,8 @@
                 taxSetting: productTaxSetting,
                 wholesale_price: wholesalePrice,
                 wholesale_min_qty: wholesaleMinQty,
+                wholesale_tiers: wholesaleTiers,
+                sale_type: saleType,
                 taxScope: taxScope,
                 taxesByScope: taxesByScope,
                 packagingCharge: packagingCharge,

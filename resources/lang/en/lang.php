@@ -1153,6 +1153,8 @@ return [
     'delete_plan_confirm' => 'Are you sure you want to delete this plan?',
     'vendor_record_not_found' => 'Store record not found',
     'wholesale_from_units' => 'from :count units',
+    'wholesale_only_minimum' => 'Sold in a minimum of :count units',
+    'wholesale_applied' => 'Wholesale price applied',
     'stores_table' => 'Stores List',
     'stores_table_text' => 'View and manage all of your stores',
     'store_create' => 'Create a Store',
