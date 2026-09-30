@@ -128,6 +128,22 @@
                                         </div>
                                     </div>
 
+                                    {{-- Shown only while wholesale is on AND the sale type involves wholesale -
+                                         with "Retail only" there is no wholesale price to withhold, so the
+                                         control would be asking a question that cannot apply.
+                                    
+                                         A plain wrapper with an inline display, NOT a d-none class: Bootstrap
+                                         display utilities carry !important and would beat jQuery's .hide(). --}}
+                                    <div class="wholesale_business_only_field" style="display:none;">
+                                        <div class="form-check width-100">
+                                            <input type="checkbox" class="wholesale_business_only" id="wholesale_business_only">
+                                            <label class="control-label"
+                                                for="wholesale_business_only">{{ trans('lang.wholesale_business_only') }}</label>
+                                            <div class="form-text text-muted">{{ trans('lang.wholesale_business_only_help') }}</div>
+                                        </div>
+                                    </div>
+
+
                                     {{-- Same shape as the Description field below, so the two boxes
                                          line up at the same width. --}}
                                     <div class="form-group row width-100">
@@ -864,6 +880,15 @@
                     ['retail', 'wholesale', 'both'].indexOf(product.saleType) !== -1
                         ? product.saleType : 'both');
 
+                /* Strictly true only. The app writes a real boolean; anything
+                 * else - absent, empty string, a product saved before the field
+                 * existed - means the tiers are open to every customer. */
+                $('#wholesale_business_only').prop('checked', product.wholesaleBusinessOnly === true);
+
+                /* After both controls above are set, never before - it reads
+                 * them to decide whether the switch applies at all. */
+                applyBusinessOnlyVisibility();
+
                 if (product.wholesaleDetails) {
                     initWholesaleEditor();
 
@@ -970,6 +995,10 @@
                     /* The store app's three-way value. Wholesale off means retail,
                      * so the dropdown only ever chooses between the other two. */
                     var saleType = wholesaleEnabled ? ($('#sale_type').val() || 'both') : 'retail';
+                    /* Only meaningful where there is a wholesale price to withhold, so it
+                     * follows the same condition the control is shown under. */
+                    var businessOnly = (wholesaleEnabled && saleType !== 'retail')
+                        && $('#wholesale_business_only').is(':checked');
                 var wholesalePrice = savedTiers.length ? savedTiers[0].price : '';
                 var wholesaleMinQty = savedTiers.length ? savedTiers[0].minQty : '';
                 let selectedTaxes = [];
@@ -1166,6 +1195,7 @@
                                 'disPrice': discount,
                                 'wholesaleEnabled': wholesaleEnabled,
                                 'saleType': saleType,
+                                'wholesaleBusinessOnly': businessOnly,
                                 'wholesalePrice': wholesaleEnabled ? wholesalePrice : '',
                                 'wholesaleMinQty': wholesaleEnabled ? wholesaleMinQty : '',
                                 /* Cleared with the toggle, like the price and quantity, so a
@@ -1875,7 +1905,29 @@
             return $('<div>').html(html).text().trim() === '' ? '' : html;
         }
 
+        /* The business-only switch, which hangs off BOTH the wholesale toggle and
+         * the sale type - "Retail only" has no wholesale price to withhold.
+         *
+         * Cleared rather than merely hidden when it does not apply, so a vendor
+         * who ticks it and then switches to Retail only cannot leave a true
+         * value behind on a product that has no wholesale pricing at all. */
+        function applyBusinessOnlyVisibility() {
+            var applies = $('#wholesale_enabled').is(':checked')
+                && $('#sale_type').val() !== 'retail';
+
+            if (applies) {
+                $('.wholesale_business_only_field').show();
+            } else {
+                $('.wholesale_business_only_field').hide();
+                $('#wholesale_business_only').prop('checked', false);
+            }
+        }
+
+        $(document).on('change', '#sale_type', applyBusinessOnlyVisibility);
+
         function applyWholesaleVisibility() {
+            applyBusinessOnlyVisibility();
+
             if ($('#wholesale_enabled').is(':checked')) {
                 $('.wholesale_fields').show();
                 $('.wholesale_column').show();

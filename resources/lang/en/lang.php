@@ -1096,6 +1096,8 @@ return [
     'sale_type_both' => 'Retail and wholesale',
     'sale_type_wholesale' => 'Wholesale only',
     'sale_type_help' => 'Retail only sells at the regular price, wholesale only sells at the tier prices, and both allows either.',
+    'wholesale_business_only' => 'Only verified Business customers get wholesale prices',
+    'wholesale_business_only_help' => 'Ordinary customers pay the regular price however many they buy. A customer counts as verified only once an administrator has approved their business account.',
     'wholesale_tier_required_error' => 'Add at least one price tier, or switch wholesale off',
     'wholesale_tiers_help' => 'Up to 5 tiers. Each tier needs a minimum quantity of at least 2 and a price below the regular price; a bigger quantity must have a lower price.',
     'add_tier' => 'Add tier',
