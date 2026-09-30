@@ -1017,8 +1017,18 @@
                                         return false; // Exit loop
                                     }
 
-                                    if (wholesaleEnabled) {
-                                        if (!variant_wholesale_price || parseFloat(variant_wholesale_price) <= 0) {
+                                    /* OPTIONAL. Blank means "no opinion" and the
+                                     * product's tiers apply to this variant as
+                                     * they stand - which is what a store wants
+                                     * when every size costs the same. Requiring
+                                     * a figure here forced a single price onto
+                                     * every variant and flattened the ladder.
+                                     *
+                                     * When it IS given it is the variant's TIER
+                                     * ONE price, so it still has to be below the
+                                     * variant's own price. */
+                                    if (wholesaleEnabled && variant_wholesale_price !== '' && variant_wholesale_price !== null) {
+                                        if (parseFloat(variant_wholesale_price) <= 0) {
                                             $(".error_top").show();
                                             $(".error_top").html("");
                                             $(".error_top").append(
@@ -1791,7 +1801,7 @@
                         var check_variant_wholesale = $('#wholesale_price_' + variant).val() ? $('#wholesale_price_' + variant).val() : '';
                         html += '<td class="wholesale_column">';
                         html += '<input type="number" id="wholesale_price_' + variant + '" value="' + check_variant_wholesale +
-                            '" min="0" class="form-control">';
+                            '" min="0" class="form-control" placeholder="{{ trans('lang.optional') }}">';
                         html += '</td>';
                         html += '<td>';
                         var check_variant_qty = $('#price_' + variant).val() ? $('#price_' + variant).val() : -1;

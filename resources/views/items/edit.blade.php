@@ -1131,8 +1131,13 @@
                                     isValid = true;
                                     return false; // Exit loop
                                 }
-                                if (wholesaleEnabled) {
-                                    if (!variant_wholesale_price || parseFloat(variant_wholesale_price) <= 0) {
+                                /* OPTIONAL. Blank means "no opinion" and the
+                                 * product's tiers apply to this variant as they
+                                 * stand. When given, it is the variant's TIER
+                                 * ONE price, so it must still be below the
+                                 * variant's own price. */
+                                if (wholesaleEnabled && variant_wholesale_price !== '' && variant_wholesale_price !== null) {
+                                    if (parseFloat(variant_wholesale_price) <= 0) {
                                         $(".error_top").show();
                                         $(".error_top").html("");
                                         $(".error_top").append("<p>{{ trans('lang.enter_positive_variant_wholesale_price_error') }}</p>");
@@ -2027,7 +2032,7 @@
                         html += '<input type="number" id="price_' + variant + '" value="' + variant_price + '" min="0" class="form-control">';
                         html += '</td>';
                         html += '<td class="wholesale_column">';
-                        html += '<input type="number" id="wholesale_price_' + variant + '" value="' + variant_wholesale_price + '" min="0" class="form-control">';
+                        html += '<input type="number" id="wholesale_price_' + variant + '" value="' + variant_wholesale_price + '" min="0" class="form-control" placeholder="{{ trans('lang.optional') }}">';
                         html += '</td>';
                         html += '<td>';
                         html += '<input type="number" id="qty_' + variant + '" value="' + variant_qty + '" min="-1" class="form-control">';

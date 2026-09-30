@@ -768,6 +768,41 @@
     /* The tier list off the product card, back as an array. Returns an empty
      * list rather than throwing when a product has no wholesale pricing,
      * which is the normal case. */
+    /* A variant's wholesale figure is its TIER-ONE price, not its only price.
+     * The product's ladder keeps its quantity breaks and its steps; the variant
+     * shifts it to start at its own figure.
+     *
+     * Read the other way, a product with tiers at 10/50/150 would charge the
+     * same per piece at 150 as at 10 the moment sizes were added - which is not
+     * a tiered product at all.
+     *
+     * This MUST match variantWholesaleTiers() in the website's
+     * layouts/footer.blade.php, or the same basket prices differently over the
+     * counter and online. */
+    function variantWholesaleTiers(tiers, variantEntryPrice) {
+        if (!Array.isArray(tiers) || tiers.length === 0) {
+            return [];
+        }
+
+        let entry = parseFloat(variantEntryPrice);
+        let base = parseFloat(tiers[0].price);
+
+        if (isNaN(entry) || entry <= 0 || isNaN(base)) {
+            return tiers.slice();
+        }
+
+        return tiers
+            .map(function (tier) {
+                return {
+                    minQty: tier.minQty,
+                    price: entry + (parseFloat(tier.price) - base)
+                };
+            })
+            .filter(function (tier) {
+                return !isNaN(tier.price) && tier.price > 0;
+            });
+    }
+
     function readWholesaleTiers(productId) {
         var raw = $('#wholesale_tiers_' + productId).val() || '';
 
@@ -1447,15 +1482,10 @@
          * resolution the website uses. */
         let wholesaleTiers = [];
         if (wholesaleEnabled) {
+            wholesaleTiers = readWholesaleTiers(id);
+
             if (variantWholesalePrice !== '') {
-                if (wholesaleMinQty) {
-                    wholesaleTiers = [{
-                        minQty: parseInt(wholesaleMinQty) || 0,
-                        price: parseFloat(variantWholesalePrice)
-                    }];
-                }
-            } else {
-                wholesaleTiers = readWholesaleTiers(id);
+                wholesaleTiers = variantWholesaleTiers(wholesaleTiers, variantWholesalePrice);
             }
         }
 
