@@ -76,6 +76,7 @@
                                                 <th>{{ trans('lang.item_info') }}</th>
                                                 <th>{{ trans('lang.store_info') }}</th>
                                                 <th>{{ trans('lang.item_price') }}</th>
+                                                <th>{{ trans('lang.sale_type') }}</th>
                                                 <th>{{ trans('lang.item_category_id') }}</th>
                                                 <th>{{ trans('lang.item_publish') }}</th>
                                                 <th>{{ trans('lang.date_created') }}</th>
@@ -269,6 +270,10 @@
                                 header: "{{ trans('lang.item_price') }}"
                             },
                             {
+                                key: 'saleTypeLabel',
+                                header: "{{ trans('lang.sale_type') }}"
+                            },
+                            {
                                 key: 'category',
                                 header: "{{ trans('lang.item_category_id') }}"
                             },
@@ -292,7 +297,7 @@
                                 const searchValue = data.search.value.toLowerCase();
                                 const orderColumnIndex = data.order[0].column;
                                 const orderDirection = data.order[0].dir;
-                                const orderableColumns = ['', 'name', '', 'finalPrice', 'category', '', 'createdDate', '']; // Ensure this matches the actual column names
+                                const orderableColumns = ['', 'name', '', 'finalPrice', 'saleTypeLabel', 'category', '', 'createdDate', '']; // Ensure this matches the actual column names
 
                                 const orderByField = orderableColumns[
                                     orderColumnIndex]; // Adjust the index to match your table
@@ -351,6 +356,27 @@
                                                         '{{ trans('lang.unknown') }}';
                                                 }
                                                 childData.category = category;
+                                                /* The sale type, resolved once
+                                                 * here so the row and the export
+                                                 * read the same value.
+                                                 *
+                                                 * A product saved before the
+                                                 * field existed has none: it is
+                                                 * "retail" when wholesale is off
+                                                 * and "both" when it is on,
+                                                 * which is how the panel writes
+                                                 * it and how the website reads
+                                                 * it. */
+                                                var saleTypeKey = String(childData.saleType || '').toLowerCase();
+                                                if (['retail', 'wholesale', 'both'].indexOf(saleTypeKey) === -1) {
+                                                    saleTypeKey = childData.wholesaleEnabled === true ? 'both' : 'retail';
+                                                }
+                                                childData.saleTypeKey = saleTypeKey;
+                                                childData.saleTypeLabel = saleTypeKey === 'wholesale'
+                                                    ? "{{ trans('lang.sale_type_wholesale') }}"
+                                                    : (saleTypeKey === 'both'
+                                                        ? "{{ trans('lang.sale_type_both') }}"
+                                                        : "{{ trans('lang.sale_type_retail') }}");
                                                 /* Same for every row, but the
                                                  * export reads the record rather
                                                  * than the table. */
@@ -366,6 +392,11 @@
                                                         (childData.finalPrice &&
                                                             childData.finalPrice
                                                             .toString().includes(
+                                                                searchValue)) ||
+                                                        (childData.saleTypeLabel &&
+                                                            childData.saleTypeLabel
+                                                            .toString()
+                                                            .toLowerCase().includes(
                                                                 searchValue)) ||
                                                         (childData.category &&
                                                             childData.category
@@ -448,11 +479,14 @@
                                 });
                             });
                         },
+                        /* Shifted by one from the sale type column on: the
+                         * checkbox, store, publish and actions columns are 0, 2,
+                         * 6 and 8 now, and Date Created is 7. */
                         columnDefs: [{
                             orderable: false,
-                            targets: [0, 2, 5, 7]
+                            targets: [0, 2, 6, 8]
                         }, ],
-                        order: [6, 'asc'],
+                        order: [7, 'asc'],
                         "language": datatableLang,
                         dom: 'lfrtipB',
                         buttons: [{
@@ -593,6 +627,17 @@
                     activeCurrency + '' + parseFloat(val.wholesalePrice).toFixed(decimal_degits);
                 html[html.length - 1] += '<br><span class="badge badge-info">{{ trans('lang.wholesale') }} ' +
                     wholesale_val + ' &times;' + val.wholesaleMinQty + '+</span>';
+            }
+
+            /* Sale type. Its own column rather than another badge on the price,
+             * because it answers a different question - the price cell says what
+             * a bulk buyer pays, this says who is allowed to be one. */
+            if (val.saleTypeKey === 'wholesale') {
+                html.push('<span class="badge badge-dark">' + val.saleTypeLabel + '</span>');
+            } else if (val.saleTypeKey === 'both') {
+                html.push('<span class="badge badge-primary">' + val.saleTypeLabel + '</span>');
+            } else {
+                html.push('<span class="badge badge-secondary">' + val.saleTypeLabel + '</span>');
             }
 
             html.push('<span class="category_' + val.categoryID + '">' + val.category + '</span>');
