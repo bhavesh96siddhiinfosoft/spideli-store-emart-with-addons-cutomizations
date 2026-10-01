@@ -1914,9 +1914,26 @@
             orderData.address = defaultShippingAddress;
         }
 
-        await manageInventory(products);
-
-        await walletTransaction(products, cart, id_order, orderVendorID, vendorDetails);
+        /* WRAPPED, because a throw in either of these is not a wrong value -
+         * it is the end of the sale. Both run BEFORE the order is written, so
+         * until now a failure here left the till with a spinner turning, no
+         * order, no message, and the stock already taken.
+         *
+         * The sale still stops - it has to - but the operator is told, rather
+         * than left wondering whether it went through. */
+        try {
+            await manageInventory(products);
+            await walletTransaction(products, cart, id_order, orderVendorID, vendorDetails);
+        } catch (error) {
+            console.error('POS: the sale could not be completed', error);
+            $('#data-table_processing').hide();
+            Swal.fire({
+                icon: 'error',
+                title: "{{trans('lang.order_failed')}}",
+                text: "{{trans('lang.there_was_issue_placing_order')}}",
+            });
+            return;
+        }
 
         await database.collection('vendor_orders').doc(id_order).set(
            orderData
@@ -2025,6 +2042,13 @@
     }
 
     async function walletTransaction(products, cart, id_order, orderVendorID, vendorDetails) {
+
+        /* RESET FIRST. These two are PAGE-LEVEL variables, so a second sale
+         * made without reloading - which is exactly what happens after a failed
+         * attempt - added its tax on top of the previous one and credited the
+         * store too much. */
+        total_tax_amount = 0;
+        orderTaxAmount = 0;
 
         let order_subtotal = 0;
         let total_discount = 0;
@@ -2150,6 +2174,16 @@
         }
 
         const snapshotsnew = await database.collection('users').where('id', '==', vendorAuthor).get();
+
+        /* NO OWNER RECORD IS POSSIBLE. `vendorDetails.author` is a user id kept
+         * on the store, and that user can have been deleted. Reading docs[0]
+         * regardless threw, and this runs BEFORE the order is written, so the
+         * sale failed with the stock already taken. Same guard as the admin
+         * panel's POS - keep the two in step. */
+        if (snapshotsnew.docs.length === 0) {
+            console.error('POS: the store owner record is missing; wallet not credited', vendorAuthor);
+            return;
+        }
 
         var vendordata = snapshotsnew.docs[0].data();
 
