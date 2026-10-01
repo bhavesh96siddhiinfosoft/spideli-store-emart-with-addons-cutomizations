@@ -154,14 +154,48 @@
             var placeholderImageData = snapshotsimage.data();
             placeholderImage = placeholderImageData.image;
         })
-        database.collection('zone').where('publish', '==', true).orderBy('name', 'asc').get().then(async function(snapshots) {
+        /* ONLY ZONES THAT SERVE THIS DELIVERYMAN'S REGION.
+         *
+         * Client bug report item 16. Every published zone used to be offered,
+         * so a store in one region could move its deliveryman to a zone in
+         * another.
+         *
+         * CALLED AFTER THE RECORD LOADS, not on page load as before, because
+         * the region comes from the record. The deliveryman's CURRENT zone is
+         * always kept in the list even when it no longer passes the filter -
+         * otherwise opening the form and saving it would silently move them.
+         *
+         * zoneServesRegion() fails open, so a record with no region (written
+         * before regions existed) still sees every zone. */
+        async function loadZones(regionId, currentZoneId) {
+            var snapshots = await database.collection('zone')
+                .where('publish', '==', true).orderBy('name', 'asc').get();
+
+            var offered = 0;
+
             snapshots.docs.forEach((listval) => {
                 var data = listval.data();
+
+                if (!zoneServesRegion(data, regionId) && data.id !== currentZoneId) {
+                    return;
+                }
+
+                offered++;
                 $('#zone').append($("<option></option>")
                     .attr("value", data.id)
                     .text(data.name));
-            })
-        });
+            });
+
+            if (offered === 0 && snapshots.docs.length > 0) {
+                console.warn('no zone serves this region; offering all zones', regionId);
+                snapshots.docs.forEach((listval) => {
+                    var data = listval.data();
+                    $('#zone').append($("<option></option>")
+                        .attr("value", data.id)
+                        .text(data.name));
+                });
+            }
+        }
         $(document).ready(function() {
             $("#country_selector").select2({
                 templateResult: formatState,
@@ -205,6 +239,10 @@
             $("#country_selector").val(phoneCode).trigger('change');
         }
               
+                /* Awaited so the options exist before the current one is
+                 * selected below. */
+                await loadZones(user.regionId || '', user.zoneId || '');
+
                 if (user.hasOwnProperty('zoneId') && user.zoneId != '') {
                     $("#zone").val(user.zoneId);
                 }

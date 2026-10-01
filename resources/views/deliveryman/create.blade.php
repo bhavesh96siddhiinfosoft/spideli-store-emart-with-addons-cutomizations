@@ -183,14 +183,45 @@
                 regionId = await resolveVendorRegionId(vendorData);
                 $('#zone').html('<option value="">{{ trans('lang.select_zone') }}</option>'); // Reset dropdown
                 database.collection('zone').where('publish', '==', true).orderBy('name', 'asc').get().then(async function(snapshots) {
-                
+
+                    /* ONLY ZONES THAT SERVE THIS STORE'S REGION.
+                     *
+                     * The store's region is already resolved above, and the
+                     * comment there says a deliveryman inherits it - but every
+                     * published zone was being offered regardless, so a store
+                     * in Yaounde could put its deliveryman in Ahmedabad.
+                     * Client bug report item 16.
+                     *
+                     * zoneServesRegion() fails open: an unresolved store region,
+                     * or a zone never assigned to one, still offers the zone.
+                     * An empty dropdown would stop the vendor working. */
+                    var offered = 0;
+
                     snapshots.docs.forEach((listval) => {
                         var data = listval.data();
-                    
+
+                        if (!zoneServesRegion(data, regionId)) {
+                            return;
+                        }
+
+                        offered++;
                         $('#zone').append($("<option></option>")
                             .attr("value", data.id)
                             .text(data.name));
                     });
+
+                    /* Nothing survived the filter - show everything rather than
+                     * an unusable form, and say why in the console. */
+                    if (offered === 0 && snapshots.docs.length > 0) {
+                        console.warn('no zone serves this store region; offering all zones', regionId);
+                        snapshots.docs.forEach((listval) => {
+                            var data = listval.data();
+                            $('#zone').append($("<option></option>")
+                                .attr("value", data.id)
+                                .text(data.name));
+                        });
+                    }
+
                     if (snapshots.docs.length === 0) {
                         $('#zone').html('<option value="">{{ trans('lang.no_zones_available') }}</option>');
                         console.error('No zones found');

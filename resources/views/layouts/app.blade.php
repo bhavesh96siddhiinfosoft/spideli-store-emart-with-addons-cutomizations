@@ -1462,6 +1462,49 @@
              *
              * The zone fallback covers stores stamped before regions existed that
              * have not saved their profile since. */
+            /* The regions a zone serves.
+             *
+             * `regionIds` is the array a zone carries today; the legacy
+             * `regionId` is read only when the array is absent, which is the
+             * rule APP-SPEC-ADMIN.md section 1 sets and the admin panel's own
+             * copy of this function follows. KEEP THE TWO IN STEP.
+             *
+             * A zone with neither returns [], which every caller must read as
+             * "serves everywhere" rather than "serves nowhere" - otherwise one
+             * unassigned zone disappears from the panel entirely. */
+            function zoneRegionIds(zone) {
+                if (!zone) {
+                    return [];
+                }
+
+                if (Array.isArray(zone.regionIds)) {
+                    return zone.regionIds;
+                }
+
+                return zone.regionId ? [zone.regionId] : [];
+            }
+
+            /* Whether a zone may be offered to a store working in `regionId`.
+             *
+             * FAILS OPEN on purpose. No region resolved, or a zone that has
+             * never been assigned to one, means the zone is offered - the same
+             * rule the rest of the panel uses for an unresolved region. An
+             * empty zone dropdown stops a vendor working altogether, which is
+             * far worse than offering one zone too many. */
+            function zoneServesRegion(zone, regionId) {
+                if (!regionId) {
+                    return true;
+                }
+
+                var regions = zoneRegionIds(zone);
+
+                if (regions.length === 0) {
+                    return true;
+                }
+
+                return regions.indexOf(regionId) !== -1;
+            }
+
             async function resolveVendorRegionId(vendor) {
                 if (!vendor) {
                     return '';
