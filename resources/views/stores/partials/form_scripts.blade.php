@@ -15,6 +15,58 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.26.0/moment.min.js"></script>
     <script>
         var database = firebase.firestore();
+
+        /* ---- 02#2 ----------------------------------------------------------
+         *
+         * THIS PANEL LOADS NO MAP LIBRARY AT ALL - unlike the admin panel,
+         * nothing here has ever needed one. So the key is read the same way
+         * the admin layout reads it and the script is added once.
+         *
+         * IF IT FAILS, NOTHING BREAKS. spideliRenderStoreLocation() falls back
+         * to the address, the coordinates and a link out to Google Maps, and
+         * the form saves exactly as it does today. The likely failure is a key
+         * restricted by referrer to the admin domain, which we cannot test
+         * from here - hence the fallback rather than a promise.
+         * ------------------------------------------------------------------ */
+        async function spideliLoadMapsForStoreForm() {
+            if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+                return;
+            }
+
+            try {
+                var snapshot = await database.collection('settings').doc('googleMapKey').get();
+                var key = snapshot.exists ? (snapshot.data() || {}).key : '';
+
+                if (!key) {
+                    console.warn('no Google Maps key is configured; showing the location without a map');
+                    return;
+                }
+
+                await new Promise(function (resolve) {
+                    var script = document.createElement('script');
+                    script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) +
+                        '&libraries=places&v=quarterly';
+                    script.async = true;
+                    script.defer = true;
+                    script.onload = resolve;
+                    /* Resolved, not rejected: a missing map must not stop the
+                     * rest of the form being set up. */
+                    script.onerror = function () {
+                        console.warn('Google Maps could not be loaded; showing the location without a map');
+                        resolve();
+                    };
+                    document.head.appendChild(script);
+                });
+            } catch (error) {
+                console.error('the map key could not be read; showing the location without a map', error);
+            }
+        }
+
+        $(document).ready(async function () {
+            await spideliLoadMapsForStoreForm();
+            spideliInitStoreLocation();
+        });
+
         var geoFirestore = new GeoFirestore(database);
         var photo = "";
         var restaurnt_photos = "";
