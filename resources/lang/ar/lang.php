@@ -1064,6 +1064,11 @@ return [
     'no_product_found' => 'لم يتم العثور على أي منتجات',
     'email_already_in_use' => 'هذا البريد الإلكتروني مسجل بالفعل. يرجى استخدام بريد إلكتروني آخر أو محاولة تسجيل الدخول.',
     'password_too_weak' => 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.',
+
+    /* 02#56: the length requirement, stated under the field and checked
+       before the account is attempted. */
+    'password_min_length' => 'يجب أن تتكون كلمة المرور من :count أحرف على الأقل.',
+    'password_min_length_help' => ':count أحرف على الأقل.',
     'email_password_signup_not_enabled' => 'التسجيل باستخدام البريد الإلكتروني وكلمة المرور غير مفعل. يرجى الاتصال بالدعم.',
     'failed_to_create_account' => 'فشل في إنشاء الحساب.',
     'your_browser_does_not_support_the_video_tag' => 'متصفحك لا يدعم علامة الفيديو.',

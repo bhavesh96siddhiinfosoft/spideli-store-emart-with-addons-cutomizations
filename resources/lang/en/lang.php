@@ -1071,6 +1071,11 @@ return [
     'no_product_found' => 'No products found',
     'email_already_in_use' => 'This email is already registered. Please use a different email or try logging in.',
     'password_too_weak' => 'Password should be at least 6 characters long.',
+
+    /* 02#56: the length requirement, stated under the field and checked
+       before the account is attempted. */
+    'password_min_length' => 'Password must be at least :count characters.',
+    'password_min_length_help' => 'At least :count characters.',
     'email_password_signup_not_enabled' => 'Email/password signup is not enabled. Please contact support.',
     'failed_to_create_account' => 'Failed to create account.',
     'your_browser_does_not_support_the_video_tag' => 'Your browser does not support the video tag.',

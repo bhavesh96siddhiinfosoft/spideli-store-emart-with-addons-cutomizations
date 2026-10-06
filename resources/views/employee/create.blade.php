@@ -82,10 +82,19 @@
                                     <div class="form-group row width-50">
                                         <label class="col-3 control-label">{{ trans('lang.password') }}</label>
                                         <div class="col-7">
-                                            <input type="password" class="form-control password res_password" required>
+                                            {{-- 02#56: minlength is here for the browser's own
+                                                 keyboard and paste handling; it enforces nothing on
+                                                 its own, because this page has NO <form> element and
+                                                 the Save button is type="button" - so `required`
+                                                 never fired either. The check that actually runs is
+                                                 in the click handler below. --}}
+                                            <input type="password" class="form-control password res_password" minlength="6" required>
+                                            {{-- The client asked for the required count to be shown
+                                                 under the field, not only after a failure. --}}
                                             <div class="form-text text-muted">
-                                                {{ trans('lang.user_password_help') }}
+                                                {{ str_replace(':count', 6, trans('lang.password_min_length_help')) }}
                                             </div>
+                                            <div class="text-danger small mt-1 password_error" style="display:none;"></div>
                                         </div>
                                     </div>
                                     <div class="form-group form-material">
@@ -286,7 +295,21 @@
 
         });
 
+        /* Cleared as soon as they start fixing it - a message that stays put
+           while the box changes reads as a form that is still refusing. */
+        $(document).on('input', '.password', function () {
+            if (spideliPasswordLengthError($(this).val()) === '') {
+                $(".password_error").hide().text('');
+            }
+        });
+
         $(".save_from_btn").click(async function() {
+            /* Cleared on every attempt, not only on typing: a password manager
+               fills the box without an input event, and a stale "too short"
+               beside a password that is now fine reads as the form refusing
+               it. Re-shown below if it is still too short. */
+            $(".password_error").hide().text('');
+
             var userFirstName = $(".user_first_name").val();
             var userLastName = $(".user_last_name").val();
             var email = $(".user_email").val().toLowerCase().trim();
@@ -327,6 +350,21 @@
                 $(".error_top").show();
                 $(".error_top").html("");
                 $(".error_top").append("<p>{{ trans('lang.user_password_help') }}</p>");
+                window.scrollTo(0, 0);
+            } else if (spideliPasswordLengthError(password) !== '') {
+                /* 02#56: BEFORE Firebase, not after it.
+                 *
+                 * Previously the only test was "is the box empty", so a short
+                 * password went all the way to Firebase and came back as
+                 * auth/weak-password. The message is shown beside the field as
+                 * well as at the top, because the person is looking at the box
+                 * they just typed in, not at the top of a scrolled page. */
+                var passwordError = spideliPasswordLengthError(password);
+                $(".password_error").text(passwordError).show();
+                $(".error_top").show();
+                $(".error_top").html("");
+                $(".error_top").append("<p>" + passwordError + "</p>");
+                $(".password").focus();
                 window.scrollTo(0, 0);
             } else if ($("#country_selector").val() == '' || $("#country_selector").val() == null) {
                 $(".error_top").show();

@@ -1685,6 +1685,46 @@
             return { ok: true, lat: lat, lng: lng };
         }
 
+        /* ---- 02#56: how short a password is too short ----
+         *
+         * Reported on the vendor's employee form: "if the password does not
+         * meet the required length, the validation fails without displaying
+         * any error message. This lack of feedback leaves the user blocked
+         * without explanation."
+         *
+         * The screens only ever checked that the box was NOT EMPTY. A short
+         * password therefore passed, went to Firebase, and came back rejected
+         * - at which point the person had already waited, and whatever they
+         * were told arrived too late to be useful while typing.
+         *
+         * SIX IS NOT OUR NUMBER. It is Firebase's floor, and this product has
+         * been quoting it for a long time in lang.password_too_weak
+         * ("Password should be at least 6 characters long"). Defined once here
+         * so a screen can state the requirement and check it with the same
+         * figure - a form that asks for one length and enforces another is
+         * the fault being reported, in a new costume.
+         *
+         * NO PASSWORD FIELD IN ANY OF THE FOUR PANELS CHECKS LENGTH TODAY.
+         * This is the shared piece; applying it to the rest is follow-up work
+         * the client has been told about. */
+        var SPIDELI_PASSWORD_MIN_LENGTH = 6;
+
+        /* The message to show, or '' when the password is acceptable.
+         *
+         * Says nothing about an EMPTY box: each screen already has its own
+         * wording for that, shown earlier in its own checks, and two messages
+         * for one empty field reads as a broken form. */
+        function spideliPasswordLengthError(password) {
+            var value = (password === null || password === undefined) ? '' : String(password);
+
+            if (value === '' || value.length >= SPIDELI_PASSWORD_MIN_LENGTH) {
+                return '';
+            }
+
+            return "{{ trans('lang.password_min_length') }}"
+                .replace(':count', SPIDELI_PASSWORD_MIN_LENGTH);
+        }
+
         /* What a Google place gives us, with nothing assumed to be present.
          *
          * An existing screen in this panel does
