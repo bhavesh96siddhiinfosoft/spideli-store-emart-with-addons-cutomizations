@@ -669,6 +669,9 @@
         }
 
         $(document).on("click", "a[name='item-delete']", async function(e) {
+            if (!confirm("{{ trans('lang.delete_item_confirm') }}")) {
+                return false;
+            }
             const id = this.id;
             await deleteDocumentWithImage('vendor_products', id, 'photo', 'photos');
             window.location = "{{ !url()->current() }}";

@@ -1234,6 +1234,7 @@ return [
     'order_history_print_none' => 'No orders in this period.',
     'total_orders' => 'Total Orders',
     'total_amount' => 'Total Amount',
+    'delete_item_confirm' => 'Are you sure you want to delete this product?',
 ];
 ?>
 

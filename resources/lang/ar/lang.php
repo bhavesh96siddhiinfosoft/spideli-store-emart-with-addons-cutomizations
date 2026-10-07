@@ -1226,6 +1226,7 @@ return [
     'order_history_print_none' => 'لا توجد طلبات في هذه الفترة.',
     'total_orders' => 'إجمالي الطلبات',
     'total_amount' => 'المبلغ الإجمالي',
+    'delete_item_confirm' => 'هل أنت متأكد أنك تريد حذف هذا المنتج؟',
 ];
 ?>
 
