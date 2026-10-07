@@ -1212,5 +1212,20 @@ return [
     'please_select_a_store' => 'الرجاء اختيار المتجر الذي يعمل به هذا الموظف',
     'employee_store_role_note' => 'الأدوار تخص المتجر، لذا تغيير المتجر يلغي الدور المختار.',
     'no_store_found_create_one_first' => 'أنشئ متجرًا قبل إضافة الموظفين.',
+    'order_history_period' => 'عرض الطلبات من',
+    'order_history_period_all' => 'كل الأوقات',
+    'order_history_period_custom' => 'اختر التواريخ...',
+    'order_history_period_apply' => 'تطبيق',
+    'order_history_period_showing' => 'المعروض: :period',
+    'order_history_period_pick_dates' => 'يرجى اختيار تاريخ البداية أو تاريخ النهاية أو كليهما.',
+    'order_history_period_bad_range' => 'تاريخ البداية بعد تاريخ النهاية.',
+    'order_history_print' => 'طباعة',
+    'order_history_print_title' => 'سجل الطلبات',
+    'order_history_print_period' => 'الفترة',
+    'order_history_print_generated' => 'تمت الطباعة في',
+    'order_history_print_none' => 'لا توجد طلبات في هذه الفترة.',
+    'total_orders' => 'إجمالي الطلبات',
+    'total_amount' => 'المبلغ الإجمالي',
 ];
 ?>
+

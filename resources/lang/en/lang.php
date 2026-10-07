@@ -1220,5 +1220,20 @@ return [
     'please_select_a_store' => 'Please select the store this employee works at',
     'employee_store_role_note' => 'Roles belong to a store, so changing the store clears the chosen role.',
     'no_store_found_create_one_first' => 'Create a store before adding employees.',
+    'order_history_period' => 'Show orders from',
+    'order_history_period_all' => 'All time',
+    'order_history_period_custom' => 'Choose dates...',
+    'order_history_period_apply' => 'Apply',
+    'order_history_period_showing' => 'Showing: :period',
+    'order_history_period_pick_dates' => 'Please choose a start date, an end date, or both.',
+    'order_history_period_bad_range' => 'The start date is after the end date.',
+    'order_history_print' => 'Print',
+    'order_history_print_title' => 'Order history',
+    'order_history_print_period' => 'Period',
+    'order_history_print_generated' => 'Printed on',
+    'order_history_print_none' => 'No orders in this period.',
+    'total_orders' => 'Total Orders',
+    'total_amount' => 'Total Amount',
 ];
 ?>
+

@@ -38,6 +38,40 @@
        <div class="table-list">
        <div class="row">
            <div class="col-12">
+               {{-- The period picker and print button --}}
+               <div class="card border mb-3" id="order_period_card">
+                   <div class="card-body p-3">
+                       <div class="d-flex flex-wrap align-items-center">
+                           <label class="mb-0 mr-2 font-weight-bold" for="order_period">
+                               <i class="mdi mdi-calendar-clock mr-1"></i>{{trans('lang.order_history_period')}}
+                           </label>
+                           <select id="order_period" class="form-control w-auto mr-2 mb-0">
+                               <option value="all">{{trans('lang.order_history_period_all')}}</option>
+                           </select>
+                           <div id="order_period_custom" class="d-flex flex-wrap align-items-center mr-2" style="display:none;">
+                               <input type="date" id="order_period_from" class="form-control w-auto mr-2 mb-0">
+                               <span class="mr-2">&ndash;</span>
+                               <input type="date" id="order_period_to" class="form-control w-auto mr-2 mb-0">
+                               <button type="button" id="order_period_apply" class="btn btn-primary btn-sm mr-2">{{trans('lang.order_history_period_apply')}}</button>
+                           </div>
+                           <span id="order_period_summary" class="text-muted small ml-auto mr-2"></span>
+                           <button type="button" id="order_history_print" class="btn btn-outline-primary btn-sm">
+                               <i class="mdi mdi-printer mr-1"></i>{{trans('lang.order_history_print')}}
+                           </button>
+                       </div>
+                   </div>
+               </div>
+
+               {{-- Shown only on paper when printed --}}
+               <div class="col-12 order-print-only mb-3" id="order_history_print_header" style="display:none;">
+                   <h3 class="mb-1">{{trans('lang.order_history_print_title')}}</h3>
+                   <p class="mb-0 small"><strong>{{trans('lang.store')}}:</strong> <span id="print_store"></span></p>
+                   <p class="mb-0 small"><strong>{{trans('lang.order_history_print_period')}}:</strong> <span id="print_period"></span></p>
+                   <p class="mb-0 small"><strong>{{trans('lang.total_orders')}}:</strong> <span id="print_total_orders"></span> | <strong>{{trans('lang.total_amount')}}:</strong> <span id="print_total_amount"></span></p>
+                   <p class="mb-2 small"><strong>{{trans('lang.order_history_print_generated')}}:</strong> <span id="print_generated"></span></p>
+                   <hr class="mt-2 mb-2">
+               </div>
+
                <div class="card border">
                  <div class="card-header d-flex justify-content-between align-items-center border-0">
                    <div class="card-header-title">
@@ -46,6 +80,7 @@
                    </div>              
                  </div>
                  <div class="card-body">
+
                          <div class="table-responsive m-t-10">
                             <table id="orderTable"
                                    class="display nowrap table table-hover table-striped table-bordered table table-striped"
@@ -102,6 +137,63 @@
             decimal_degits = currencyData.decimal_degits;
         }
     });
+
+    var orderPeriodFrom = null;
+    var orderPeriodTo = null;
+    var orderPeriodLabel = '';
+    var periodsPopulated = false;
+    var currentStoreTitle = '';
+    var totalFilteredAmount = 0;
+
+    function populateOrderPeriods(snapshots) {
+        if (periodsPopulated) return;
+        var seen = {};
+        var months = [];
+        snapshots.docs.forEach(function (doc) {
+            var created = doc.data().createdAt;
+            if (!created || typeof created.toDate !== 'function') {
+                return;
+            }
+            var date = created.toDate();
+            var key = date.getFullYear() + '-' + ('0' + (date.getMonth() + 1)).slice(-2);
+            if (!seen[key]) {
+                seen[key] = true;
+                months.push({
+                    key: key,
+                    label: date.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+                });
+            }
+        });
+        months.sort(function (a, b) { return a.key < b.key ? 1 : -1; });
+
+        var select = $('#order_period');
+        select.find('option:not([value="all"])').remove();
+        months.forEach(function (month) {
+            select.append($('<option>').val('month:' + month.key).text(month.label));
+        });
+        select.append($('<option>').val('custom').text("{{ trans('lang.order_history_period_custom') }}"));
+        periodsPopulated = true;
+    }
+
+    function withinOrderPeriod(order) {
+        if (!orderPeriodFrom && !orderPeriodTo) {
+            return true;
+        }
+        if (!order.createdAt || typeof order.createdAt.toDate !== 'function') {
+            return true;
+        }
+        var date = order.createdAt.toDate();
+        if (orderPeriodFrom && date < orderPeriodFrom) { return false; }
+        if (orderPeriodTo && date > orderPeriodTo) { return false; }
+        return true;
+    }
+
+    function setOrderPeriodSummary(label) {
+        orderPeriodLabel = label || '';
+        $('#order_period_summary').text(label
+            ? "{{ trans('lang.order_history_period_showing') }}".replace(':period', label)
+            : '');
+    }
 
     document.addEventListener("DOMContentLoaded", async function() {
         if (authRole === 'employee') {               
@@ -179,6 +271,7 @@
                 }
 
                 await ref.get().then(async function (querySnapshot) {
+                    populateOrderPeriods(querySnapshot);
                     if (querySnapshot.empty) {
                         $('.total_count').text(0);
                         $('#data-table_processing').hide(); // Hide loader
@@ -193,10 +286,16 @@
 
                     let records = [];
                     let filteredRecords = [];
+                    totalFilteredAmount = 0;
 
                     await Promise.all(querySnapshot.docs.map(async (doc) => {
                         let childData = doc.data();
                         childData.id = doc.id; // Ensure the document ID is included in the data
+
+                        if (!withinOrderPeriod(childData)) {
+                            return;
+                        }
+
                         if(childData.hasOwnProperty('author') && childData.author != ''){
                             childData.clientName = childData.author.firstName + ' ' + childData.author.lastName;                            
                         }else{
@@ -210,6 +309,8 @@
 
                         var price =  await buildHTMLProductstotal(childData);
                         childData.amount = price;
+                        var numAmount = parseFloat(String(price).replace(/[^0-9.]/g, '')) || 0;
+                        totalFilteredAmount += numAmount;
                         
                         if (childData.hasOwnProperty('takeAway') && childData.takeAway) {
                             childData.orderType = '{{trans("lang.order_takeaway")}}';
@@ -262,7 +363,7 @@
                     
                     const totalRecords = filteredRecords.length;
                     $('.total_count').text(totalRecords);
-                    const paginatedRecords = filteredRecords.slice(start, start + length);
+                    const paginatedRecords = (length === -1) ? filteredRecords : filteredRecords.slice(start, start + length);
                 
                     await Promise.all(paginatedRecords.map(async (childData) => {
                         var getData = await buildHTML(childData);
@@ -333,6 +434,85 @@
                         return this.nodeType === 3; 
                     }).remove();
                 }
+        });
+
+        if (authRole !== 'employee') {
+            resolveCurrentStoreId(user_id).then(function(storeId) {
+                database.collection('vendors').doc(storeId).get().then(function(s) {
+                    if (s.exists && s.data().title) {
+                        currentStoreTitle = s.data().title;
+                    }
+                });
+            });
+        } else {
+            database.collection('vendors').doc(empVendorId).get().then(function(s) {
+                if (s.exists && s.data().title) {
+                    currentStoreTitle = s.data().title;
+                }
+            });
+        }
+
+        $(document).on('change', '#order_period', function () {
+            var value = $(this).val();
+            $('#order_period_custom').toggle(value === 'custom');
+
+            if (value === 'custom') {
+                return;
+            }
+
+            if (value === 'all') {
+                orderPeriodFrom = null;
+                orderPeriodTo = null;
+                setOrderPeriodSummary('');
+            } else {
+                var parts = value.replace('month:', '').split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                orderPeriodFrom = new Date(year, month, 1, 0, 0, 0, 0);
+                orderPeriodTo = new Date(year, month + 1, 0, 23, 59, 59, 999);
+                setOrderPeriodSummary($(this).find('option:selected').text());
+            }
+            table.draw();
+        });
+
+        $(document).on('click', '#order_period_apply', function () {
+            var from = $('#order_period_from').val();
+            var to = $('#order_period_to').val();
+            if (!from && !to) {
+                alert("{{ trans('lang.order_history_period_pick_dates') }}");
+                return;
+            }
+            orderPeriodFrom = from ? new Date(from + 'T00:00:00') : null;
+            orderPeriodTo = to ? new Date(to + 'T23:59:59') : null;
+            if (orderPeriodFrom && orderPeriodTo && orderPeriodFrom > orderPeriodTo) {
+                alert("{{ trans('lang.order_history_period_bad_range') }}");
+                return;
+            }
+            setOrderPeriodSummary([from, to].filter(Boolean).join(' - '));
+            table.draw();
+        });
+
+        $(document).on('click', '#order_history_print', function () {
+            $('#print_store').text(currentStoreTitle || $('.card-header-title h3').text() || 'Store');
+            $('#print_period').text(orderPeriodLabel !== ''
+                ? orderPeriodLabel
+                : "{{ trans('lang.order_history_period_all') }}");
+
+            var now = new Date();
+            $('#print_generated').text(now.toDateString() + ' ' + now.toLocaleTimeString());
+            $('#print_total_orders').text($('.total_count').text() || '0');
+
+            var formattedTotal = currencyAtRight 
+                ? totalFilteredAmount.toFixed(decimal_degits) + '' + currentCurrency 
+                : currentCurrency + '' + totalFilteredAmount.toFixed(decimal_degits);
+            $('#print_total_amount').text(formattedTotal);
+
+            var currentLen = table.page.len();
+            table.page.len(-1).draw();
+            setTimeout(function () {
+                window.print();
+                table.page.len(currentLen).draw();
+            }, 500);
         });
 
     });
@@ -517,5 +697,61 @@
 
 </script>
 
+<style>
+    .order-print-only { display: none; }
+
+    @media print {
+        header, nav, footer, .left-sidebar, .topbar, .navbar, .page-titles,
+        .breadcrumb, #order_period_card, .admin-top-section,
+        .dataTables_length, .dataTables_filter, .dt-buttons,
+        .dataTables_info, .dataTables_paginate, #data-table_processing,
+        .card-header, .action-btn, th:last-child, td:last-child,
+        .sidebar-footer { display: none !important; }
+
+        .order-print-only { display: block !important; }
+
+        .page-wrapper { margin-left: 0 !important; padding: 0 !important; }
+        .container-fluid { padding: 0 !important; }
+        .card, .card-body, .table-list, .table-responsive {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+        }
+
+        body {
+            background: #fff !important;
+            font-size: 10pt;
+            color: #000 !important;
+        }
+
+        table#orderTable {
+            width: 100% !important;
+            border-collapse: collapse !important;
+        }
+
+        table#orderTable th, table#orderTable td {
+            border: 1px solid #ccc !important;
+            padding: 6px 8px !important;
+        }
+
+        table#orderTable tr {
+            page-break-inside: avoid;
+        }
+
+        .badge {
+            border: 1px solid #000 !important;
+            color: #000 !important;
+            background: transparent !important;
+        }
+
+        a {
+            text-decoration: none !important;
+            color: #000 !important;
+        }
+    }
+</style>
 
 @endsection
+
