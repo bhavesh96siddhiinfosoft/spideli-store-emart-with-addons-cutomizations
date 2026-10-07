@@ -1219,7 +1219,7 @@ return [
     'order_history_period_showing' => 'المعروض: :period',
     'order_history_period_pick_dates' => 'يرجى اختيار تاريخ البداية أو تاريخ النهاية أو كليهما.',
     'order_history_period_bad_range' => 'تاريخ البداية بعد تاريخ النهاية.',
-    'order_history_print' => 'طباعة',
+    'order_history_print' => 'تصدير PDF / طباعة',
     'order_history_print_title' => 'سجل الطلبات',
     'order_history_print_period' => 'الفترة',
     'order_history_print_generated' => 'تمت الطباعة في',

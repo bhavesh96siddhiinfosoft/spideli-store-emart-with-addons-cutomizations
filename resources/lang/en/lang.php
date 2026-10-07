@@ -1227,7 +1227,7 @@ return [
     'order_history_period_showing' => 'Showing: :period',
     'order_history_period_pick_dates' => 'Please choose a start date, an end date, or both.',
     'order_history_period_bad_range' => 'The start date is after the end date.',
-    'order_history_print' => 'Print',
+    'order_history_print' => 'Export PDF / Print',
     'order_history_print_title' => 'Order history',
     'order_history_print_period' => 'Period',
     'order_history_print_generated' => 'Printed on',
