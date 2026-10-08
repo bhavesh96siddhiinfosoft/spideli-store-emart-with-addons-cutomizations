@@ -13,7 +13,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ config('app.name', 'Laravel') }}</title>
-        <link rel="icon" type="image/x-icon" href="{{ asset('images/logo-light-icon.png')}}">
+        <link rel="icon" type="image/x-icon" href="{{ asset('images/spideli-circle.png')}}">
 
 
         <!-- Fonts -->
@@ -135,8 +135,9 @@
                 <div class="login-logo text-center py-3" style="margin-top:5%;">
 
                     <a href="#"
-                        style="display: inline-block;background: #fff;padding: 10px;border-radius: 5px;"><img
-                            src="{{ asset('images/logo_web.png') }}" onerror="this.onerror=null; this.src='{{ asset('images/logo_web.png') }}';"> </a>
+                        style="display: inline-block;background: #fff;padding: 10px;border-radius: 5px;">
+                        <img
+                            src="{{ asset('images/spideli_dark_logo.png') }}" onerror="this.onerror=null; this.src='{{ asset('images/spideli_dark_logo.png') }}';" style="width: 50%;"> </a>
 
                 </div>
 

@@ -6,10 +6,10 @@
 <meta name="description" content="eMart">
 <meta name="author" content="eMart">
 <meta name="csrf-token" content="{{ csrf_token() }}" />
-<link rel="icon" type="image/png" href="{{asset('img/fav.png')}}">
-<title>eMart Store</title>
+<link rel="icon" type="image/png" href="{{asset('images/spideli-circle.png')}}">
+<title>{{ config('app.name', 'Laravel') }}</title>
 
-<link rel="icon" type="image/x-icon" href="{{ asset('images/logo-light-icon.png') }}">
+<link rel="icon" type="image/x-icon" href="{{ asset('images/spideli-circle.png') }}">
     <!-- Fonts -->
     <link rel="dns-prefetch" href="//fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">

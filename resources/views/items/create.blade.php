@@ -420,6 +420,22 @@
                             </div>
 
                         </fieldset>
+                        <fieldset class="delivery_charges_wrapper" id="delivery_charges_wrapper" style="display:none;">
+                            <legend>{{ trans('lang.delivery_charge') }}</legend>
+                            <div class="outline-wrapper">
+                                <div id="delivery_charges_list" class="mb-3"></div>
+                                <div class="alert alert-warning mb-2" id="delivery_charge_max_warning" style="display:none;">
+                                    {{ trans('lang.max_delivery_charges_warning') }}
+                                </div>
+                                <div class="form-group row width-100">
+                                    <div class="col-7">
+                                        <button type="button" class="btn btn-primary" id="add_delivery_charge_btn">
+                                            <i class="fa fa-plus"></i> {{ trans('lang.add_delivery_charge') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
                         <fieldset class="specification-wrapper">
 
                             <legend>{{ trans('lang.product_specification') }}</legend>
@@ -538,6 +554,9 @@
         var currencyAtRight = false;
         var decimal_degits = 0;
         var categories_list=[];
+        var deliveryCharges = [];
+        var isDeliveryChargeCustomizationEnabled = false;
+        var distanceType = 'Km';
         var authRole = "{{ $authRole }}";
         var empVendorId = "{{ $empVendorId }}";
         let currentPermissions = {
@@ -546,6 +565,16 @@
         var vendorLatitude = '';
         var vendorLongitude = '';
         var countryName = '';
+
+        var refDriverNearBy = database.collection('settings').doc("DriverNearBy");
+        refDriverNearBy.get().then(async function(snapshot) {
+            var data = snapshot.data();
+            if (data && data.distanceType) {
+                distanceType = data.distanceType;
+                renderDeliveryCharges();
+            }
+        });
+
         var subscriptionBusinessModel = database.collection('settings').doc("vendor");
         subscriptionBusinessModel.get().then(async function(snapshots) {
                 var subscriptionSetting = snapshots.data();
@@ -562,6 +591,7 @@
             if (currencyData.decimal_degits) {
                 decimal_degits = currencyData.decimal_degits;
             }
+            renderDeliveryCharges();
         });
         
         database.collection('users').where('id', '==', vendorUserId).get().then(async function(snapshots) {
@@ -687,11 +717,35 @@
                             
                         }
                     }
+
+                    var isEligibleService = (
+                        section_data.serviceTypeFlag === "delivery-service" ||
+                        section_data.serviceTypeFlag === "ecommerce-service" ||
+                        section_data.serviceTypeId === "TGTP44Pgu5G6BU2up7iY" ||
+                        section_data.serviceTypeId === "ny3sssVJ7FCrPgxvsZNO" ||
+                        section_data.serviceType === "Multivendor Delivery Service" ||
+                        section_data.serviceType === "Ecommerce Service"
+                    );
+                    var isCustomizationActive = Boolean(
+                        section_data.is_delivery_charge_customization ||
+                        section_data.deliveryChargeCustomization ||
+                        section_data.isDeliveryChargeCustomization
+                    );
+
+                    if (isEligibleService && isCustomizationActive) {
+                        isDeliveryChargeCustomizationEnabled = true;
+                        $('#delivery_charges_wrapper').show();
+                    } else {
+                        isDeliveryChargeCustomizationEnabled = false;
+                        $('#delivery_charges_wrapper').hide();
+                    }
                 });
             } else {
                 $('.brandDiv').hide();
                 $("#brand").val('');
                 $("#is_digital_div").hide();
+                isDeliveryChargeCustomizationEnabled = false;
+                $('#delivery_charges_wrapper').hide();
             }
 
             if (data.section_id != undefined && data.section_id != '') {
@@ -871,6 +925,7 @@
                     var wholesalePrice = savedTiers.length ? savedTiers[0].price : '';
                     var wholesaleMinQty = savedTiers.length ? savedTiers[0].minQty : '';
                     var item_quantity = $(".item_quantity").val();
+                    syncDeliveryChargesValues();
                     var discount = $(".item_discount").val();
                     var category = $("#item_category option:selected").val() || '';
                     var brand = $("#brand").val();
@@ -976,6 +1031,20 @@
                         $(".error_top").html("");
                         $(".error_top").append(
                             "<p>{{ trans('lang.upload_digital_file_error') }}</p>");
+                        window.scrollTo(0, 0);
+
+                    } else if (isDeliveryChargeCustomizationEnabled && deliveryCharges.length === 0) {
+                        $(".error_top").show();
+                        $(".error_top").html("");
+                        $(".error_top").append(
+                            "<p>{{ trans('lang.enter_delivery_charge_error') }}</p>");
+                        window.scrollTo(0, 0);
+
+                    } else if (isDeliveryChargeCustomizationEnabled && hasInvalidDeliveryCharges(deliveryCharges)) {
+                        $(".error_top").show();
+                        $(".error_top").html("");
+                        $(".error_top").append(
+                            "<p>{{ trans('lang.invalid_delivery_charge_error') }}</p>");
                         window.scrollTo(0, 0);
 
                     } else {
@@ -1096,6 +1165,19 @@
                                 if (IMG.length > 0) {
                                     photo = IMG[0];
                                 }
+                                var formattedDeliveryCharges = [];
+                                if (isDeliveryChargeCustomizationEnabled && deliveryCharges.length > 0) {
+                                    deliveryCharges.forEach(function(tier) {
+                                        formattedDeliveryCharges.push({
+                                            delivery_charges_per_km: parseFloat(tier.delivery_charges_per_km),
+                                            minimum_delivery_charges: parseFloat(tier.minimum_delivery_charges),
+                                            minimum_delivery_charges_within_km: parseFloat(tier.minimum_delivery_charges_within_km),
+                                            deliveryChargesPerKm: parseFloat(tier.delivery_charges_per_km),
+                                            minimumDeliveryCharges: parseFloat(tier.minimum_delivery_charges),
+                                            minimumDeliveryChargesWithinKm: parseFloat(tier.minimum_delivery_charges_within_km)
+                                        });
+                                    });
+                                }
                                 database.collection('vendor_products')
                                     .doc(id).set({
                                         'name': name,
@@ -1141,6 +1223,8 @@
                                         'digitalProduct': DigitalImg,
                                         'createdAt': firebase.firestore.FieldValue.serverTimestamp() ,
                                         'taxSetting': selectedTaxes,
+                                        'delivery_charges': formattedDeliveryCharges,
+                                        'deliveryCharges': formattedDeliveryCharges,
                                     }).then(function(result) {
                                         window.location.href =
                                             '{{ route('items') }}';
@@ -1743,6 +1827,167 @@
         }
 
         $(document).on('change', '#wholesale_enabled', applyWholesaleVisibility);
+
+        function syncDeliveryChargesValues() {
+            $('#delivery_charges_tbody tr').each(function(index) {
+                if (deliveryCharges[index]) {
+                    deliveryCharges[index].delivery_charges_per_km = $(this).find('.delivery_charges_per_km').val();
+                    deliveryCharges[index].minimum_delivery_charges = $(this).find('.minimum_delivery_charges').val();
+                    deliveryCharges[index].minimum_delivery_charges_within_km = $(this).find('.minimum_delivery_charges_within_km').val();
+                }
+            });
+        }
+
+        function renderDeliveryCharges() {
+            var container = document.getElementById('delivery_charges_list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            var maxWarning = $('#delivery_charge_max_warning');
+            var addBtn = $('#add_delivery_charge_btn');
+            if (deliveryCharges.length >= 5) {
+                addBtn.prop('disabled', true);
+                maxWarning.show();
+            } else {
+                addBtn.prop('disabled', false);
+                maxWarning.hide();
+            }
+
+            if (deliveryCharges.length === 0) {
+                return;
+            }
+
+            var tableWrapper = document.createElement('div');
+            tableWrapper.className = 'table-responsive';
+
+            var table = document.createElement('table');
+            table.className = 'table table-bordered mb-0';
+
+            var thead = document.createElement('thead');
+            var headerRow = document.createElement('tr');
+
+            var distUnit = distanceType ? distanceType : 'Km';
+            var currSym = currentCurrency ? currentCurrency : '$';
+
+            var thPerKm = document.createElement('th');
+            thPerKm.innerHTML = '{{ trans('lang.delivery_charges_per') }} ' + distUnit + ' <span class="text-danger">*</span>';
+
+            var thMinCharge = document.createElement('th');
+            thMinCharge.innerHTML = '{{ trans('lang.minimum_delivery_charges') }} (' + currSym + ') <span class="text-danger">*</span>';
+
+            var thMinWithin = document.createElement('th');
+            thMinWithin.innerHTML = '{{ trans('lang.minimum_delivery_charges_within') }} ' + distUnit + ' <span class="text-danger">*</span>';
+
+            var thAction = document.createElement('th');
+            thAction.style.width = '80px';
+            thAction.className = 'text-center';
+            thAction.innerHTML = '{{ trans('lang.actions') }}';
+
+            headerRow.appendChild(thPerKm);
+            headerRow.appendChild(thMinCharge);
+            headerRow.appendChild(thMinWithin);
+            headerRow.appendChild(thAction);
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            var tbody = document.createElement('tbody');
+            tbody.id = 'delivery_charges_tbody';
+
+            deliveryCharges.forEach(function(tier, index) {
+                var tr = document.createElement('tr');
+
+                var tdPerKm = document.createElement('td');
+                var perKmInput = document.createElement('input');
+                perKmInput.type = 'number';
+                perKmInput.min = '0';
+                perKmInput.step = 'any';
+                perKmInput.className = 'form-control delivery_charges_per_km';
+                perKmInput.placeholder = '{{ trans('lang.delivery_charges_per_km') }}';
+                perKmInput.value = (tier.delivery_charges_per_km !== undefined && tier.delivery_charges_per_km !== null) ? tier.delivery_charges_per_km : '';
+                perKmInput.addEventListener('input', function() {
+                    deliveryCharges[index].delivery_charges_per_km = this.value;
+                });
+                tdPerKm.appendChild(perKmInput);
+
+                var tdMinCharge = document.createElement('td');
+                var minChargeInput = document.createElement('input');
+                minChargeInput.type = 'number';
+                minChargeInput.min = '0';
+                minChargeInput.step = 'any';
+                minChargeInput.className = 'form-control minimum_delivery_charges';
+                minChargeInput.placeholder = '{{ trans('lang.minimum_delivery_charges') }}';
+                minChargeInput.value = (tier.minimum_delivery_charges !== undefined && tier.minimum_delivery_charges !== null) ? tier.minimum_delivery_charges : '';
+                minChargeInput.addEventListener('input', function() {
+                    deliveryCharges[index].minimum_delivery_charges = this.value;
+                });
+                tdMinCharge.appendChild(minChargeInput);
+
+                var tdMinWithin = document.createElement('td');
+                var minWithinInput = document.createElement('input');
+                minWithinInput.type = 'number';
+                minWithinInput.min = '0';
+                minWithinInput.step = 'any';
+                minWithinInput.className = 'form-control minimum_delivery_charges_within_km';
+                minWithinInput.placeholder = '{{ trans('lang.minimum_delivery_charges_within_km') }}';
+                minWithinInput.value = (tier.minimum_delivery_charges_within_km !== undefined && tier.minimum_delivery_charges_within_km !== null) ? tier.minimum_delivery_charges_within_km : '';
+                minWithinInput.addEventListener('input', function() {
+                    deliveryCharges[index].minimum_delivery_charges_within_km = this.value;
+                });
+                tdMinWithin.appendChild(minWithinInput);
+
+                var tdAction = document.createElement('td');
+                tdAction.className = 'text-center align-middle';
+                var deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'btn btn-danger btn-sm';
+                deleteBtn.innerHTML = '<i class="fa fa-trash"></i>';
+                deleteBtn.title = '{{ trans('lang.delete') }}';
+                deleteBtn.addEventListener('click', function() {
+                    syncDeliveryChargesValues();
+                    deliveryCharges.splice(index, 1);
+                    renderDeliveryCharges();
+                });
+                tdAction.appendChild(deleteBtn);
+
+                tr.appendChild(tdPerKm);
+                tr.appendChild(tdMinCharge);
+                tr.appendChild(tdMinWithin);
+                tr.appendChild(tdAction);
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(tbody);
+            tableWrapper.appendChild(table);
+            container.appendChild(tableWrapper);
+        }
+
+        $(document).on('click', '#add_delivery_charge_btn', function() {
+            if (deliveryCharges.length >= 5) {
+                return;
+            }
+            syncDeliveryChargesValues();
+            deliveryCharges.push({
+                delivery_charges_per_km: '',
+                minimum_delivery_charges: '',
+                minimum_delivery_charges_within_km: ''
+            });
+            renderDeliveryCharges();
+        });
+
+        function hasInvalidDeliveryCharges(tiers) {
+            if (!tiers || tiers.length === 0) return true;
+            for (var i = 0; i < tiers.length; i++) {
+                var perKm = tiers[i].delivery_charges_per_km;
+                var minCharge = tiers[i].minimum_delivery_charges;
+                var minWithin = tiers[i].minimum_delivery_charges_within_km;
+                if (perKm === '' || perKm === null || isNaN(perKm) || parseFloat(perKm) < 0 ||
+                    minCharge === '' || minCharge === null || isNaN(minCharge) || parseFloat(minCharge) < 0 ||
+                    minWithin === '' || minWithin === null || isNaN(minWithin) || parseFloat(minWithin) < 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         function variants_update() {
             var html = '';

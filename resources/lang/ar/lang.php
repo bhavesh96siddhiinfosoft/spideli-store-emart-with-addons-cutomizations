@@ -1227,6 +1227,15 @@ return [
     'total_orders' => 'إجمالي الطلبات',
     'total_amount' => 'المبلغ الإجمالي',
     'delete_item_confirm' => 'هل أنت متأكد أنك تريد حذف هذا المنتج؟',
+    'admin_and_store_manager_customize_delivery_charges' => 'يمكن للمسؤول ومدير المتجر تخصيص رسوم التوصيل',
+    'add_delivery_charge' => 'إضافة رسوم التوصيل',
+    'delivery_distance' => 'المسافة',
+    'delivery_charge_amount' => 'الرسوم',
+    'enter_delivery_charge_error' => 'يرجى إضافة رسم توصيل واحد على الأقل.',
+    'invalid_delivery_charge_error' => 'يرجى إدخال قيم صالحة لرسوم التوصيل لكل كم، والحد الأدنى لرسوم التوصيل، والحد الأدنى لرسوم التوصيل ضمن كم في جميع الصفوف.',
+    'max_delivery_charges_warning' => 'يمكنك إضافة ما يصل إلى 5 رسوم توصيل فقط كحد أقصى.',
+    'delivery_charges_per' => 'رسوم التوصيل لكل',
+    'minimum_delivery_charges_within' => 'الحد الأدنى لرسوم التوصيل ضمن',
 ];
 ?>
 
