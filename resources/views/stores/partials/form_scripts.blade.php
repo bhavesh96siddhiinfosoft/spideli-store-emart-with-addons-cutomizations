@@ -48,10 +48,24 @@
                         '&libraries=places&v=quarterly';
                     script.async = true;
                     script.defer = true;
-                    script.onload = resolve;
+                    var timer = setTimeout(function () {
+                        console.warn('Google Maps load timed out; showing the location without a map');
+                        resolve();
+                    }, 4000);
+                    script.onload = function () {
+                        clearTimeout(timer);
+                        if (typeof spideliAttachStoreAutocomplete === 'function') {
+                            spideliAttachStoreAutocomplete();
+                        }
+                        if (typeof spideliRenderStoreLocation === 'function') {
+                            spideliRenderStoreLocation();
+                        }
+                        resolve();
+                    };
                     /* Resolved, not rejected: a missing map must not stop the
                      * rest of the form being set up. */
                     script.onerror = function () {
+                        clearTimeout(timer);
                         console.warn('Google Maps could not be loaded; showing the location without a map');
                         resolve();
                     };
@@ -62,9 +76,11 @@
             }
         }
 
-        $(document).ready(async function () {
-            await spideliLoadMapsForStoreForm();
-            spideliInitStoreLocation();
+        $(document).ready(function () {
+            if (typeof spideliInitStoreLocation === 'function') {
+                spideliInitStoreLocation();
+            }
+            spideliLoadMapsForStoreForm();
         });
 
         var geoFirestore = new GeoFirestore(database);
@@ -420,6 +436,10 @@
                     $(".vendor_latitude").val(vendor.latitude);
                     $(".vendor_longitude").val(vendor.longitude);
                     $(".vendor_description").val(vendor.description);
+                    if (typeof spideliRenderStoreLocation === 'function') {
+                        spideliRenderStoreLocation();
+                    }
+                    $(".vendor_address, .vendor_latitude, .vendor_longitude").trigger('change');
                     if (packagingChargeEnable) {
                         $('.packagingChargeEnable').removeClass('d-none');
                         $('#packagingChargeDiv').removeClass('d-none');
