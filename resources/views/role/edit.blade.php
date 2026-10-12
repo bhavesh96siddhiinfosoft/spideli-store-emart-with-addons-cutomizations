@@ -203,6 +203,18 @@
                                                                 </td>
                                                             </tr>
 
+                                                            {{-- 16. Customer chat - bug report point 69. The vendor app
+                                                                 reads this ("Chat") to let an employee see and answer the
+                                                                 store's customer messages, which are addressed to the
+                                                                 owner. See docs/BUG-REPORT-01-APP.md, Doc 69. --}}
+                                                            <tr>
+                                                                <td><strong>{{ trans('lang.employee_chat_permission') }}</strong></td>
+                                                                <td>
+                                                                    <input type="checkbox" class="permission" id="chat_manage" data-title="Chat" data-action="isActive">
+                                                                    <label class="control-label2" for="chat_manage">{{ trans('lang.employee_chat_permission_help') }}</label>
+                                                                </td>
+                                                            </tr>
+
                                                         </tbody>
                                                     </table>
                                                 </div>

@@ -1244,6 +1244,8 @@ return [
     'max_delivery_charges_warning' => 'You can add a maximum of 5 delivery charges only.',
     'delivery_charges_per' => 'Delivery Charges Per',
     'minimum_delivery_charges_within' => 'Minimum Delivery Charge Within',
+    'employee_chat_permission' => 'Customer Chat',
+    'employee_chat_permission_help' => 'Allow to read and answer customer messages',
 ];
 ?>
 

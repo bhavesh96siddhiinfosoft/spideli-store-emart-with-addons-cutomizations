@@ -1236,6 +1236,8 @@ return [
     'max_delivery_charges_warning' => 'يمكنك إضافة ما يصل إلى 5 رسوم توصيل فقط كحد أقصى.',
     'delivery_charges_per' => 'رسوم التوصيل لكل',
     'minimum_delivery_charges_within' => 'الحد الأدنى لرسوم التوصيل ضمن',
+    'employee_chat_permission' => 'محادثة العملاء',
+    'employee_chat_permission_help' => 'السماح بقراءة رسائل العملاء والرد عليها',
 ];
 ?>
 
