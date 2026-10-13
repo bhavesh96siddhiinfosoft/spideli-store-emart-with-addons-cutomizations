@@ -1246,6 +1246,9 @@ return [
     'minimum_delivery_charges_within' => 'Minimum Delivery Charge Within',
     'employee_chat_permission' => 'Customer Chat',
     'employee_chat_permission_help' => 'Allow to read and answer customer messages',
+    'order_history_status' => 'Status',
+    'order_history_status_all' => 'All statuses',
+    'order_history_print_status' => 'Status',
 ];
 ?>
 

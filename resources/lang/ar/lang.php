@@ -1238,6 +1238,9 @@ return [
     'minimum_delivery_charges_within' => 'الحد الأدنى لرسوم التوصيل ضمن',
     'employee_chat_permission' => 'محادثة العملاء',
     'employee_chat_permission_help' => 'السماح بقراءة رسائل العملاء والرد عليها',
+    'order_history_status' => 'الحالة',
+    'order_history_status_all' => 'كل الحالات',
+    'order_history_print_status' => 'الحالة',
 ];
 ?>
 

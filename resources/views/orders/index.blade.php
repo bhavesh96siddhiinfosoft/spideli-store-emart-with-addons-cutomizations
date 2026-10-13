@@ -48,6 +48,11 @@
                            <select id="order_period" class="form-control w-auto mr-2 mb-0">
                                <option value="all">{{trans('lang.order_history_period_all')}}</option>
                            </select>
+                           {{-- Point 72: export one status, or all of them --}}
+                           <label class="mb-0 mr-2 font-weight-bold" for="order_status_filter">{{ trans('lang.order_history_status') }}</label>
+                           <select id="order_status_filter" class="form-control w-auto mr-2 mb-0">
+                               <option value="">{{ trans('lang.order_history_status_all') }}</option>
+                           </select>
                            <div id="order_period_custom" class="d-flex flex-wrap align-items-center mr-2" style="display:none;">
                                <input type="date" id="order_period_from" class="form-control w-auto mr-2 mb-0">
                                <span class="mr-2">&ndash;</span>
@@ -67,6 +72,7 @@
                    <h3 class="mb-1">{{trans('lang.order_history_print_title')}}</h3>
                    <p class="mb-0 small"><strong>{{trans('lang.store')}}:</strong> <span id="print_store"></span></p>
                    <p class="mb-0 small"><strong>{{trans('lang.order_history_print_period')}}:</strong> <span id="print_period"></span></p>
+                   <p class="mb-0 small"><strong>{{ trans('lang.order_history_print_status') }}:</strong> <span id="print_status"></span></p>
                    <p class="mb-0 small"><strong>{{trans('lang.total_orders')}}:</strong> <span id="print_total_orders"></span> | <strong>{{trans('lang.total_amount')}}:</strong> <span id="print_total_amount"></span></p>
                    <p class="mb-2 small"><strong>{{trans('lang.order_history_print_generated')}}:</strong> <span id="print_generated"></span></p>
                    <hr class="mt-2 mb-2">
@@ -175,6 +181,44 @@
         periodsPopulated = true;
     }
 
+    /* ---- Point 72: export by order status ---------------------------------
+     * Point 53 printed every order of the period, whatever its status. The
+     * client asked to choose ONE status, or all. The list, the totals and the
+     * printed sheet all follow this choice, exactly as they follow the period.
+     * The choices are the statuses this store's orders actually have, in the
+     * order an order moves through them; any other status is added after. */
+    var orderStatusFilter = '';
+    var ORDER_STATUS_ORDER = ['Order Placed', 'Order Accepted', 'Driver Pending', 'Driver Accepted',
+        'Order Shipped', 'In Transit', 'Order Completed', 'Order Cancelled', 'Order Rejected', 'Driver Rejected'];
+
+    function populateOrderStatuses(snapshots) {
+        var seen = {};
+        snapshots.docs.forEach(function (doc) {
+            var status = doc.data().status;
+            if (status) {
+                seen[status] = true;
+            }
+        });
+        var statuses = ORDER_STATUS_ORDER.filter(function (s) { return seen[s]; })
+            .concat(Object.keys(seen).filter(function (s) { return ORDER_STATUS_ORDER.indexOf(s) === -1; }).sort());
+
+        var select = $('#order_status_filter');
+        var keep = select.val() || '';
+        select.find('option:not([value=""])').remove();
+        statuses.forEach(function (s) {
+            select.append($('<option>').val(s).text(s));
+        });
+        if (statuses.indexOf(keep) === -1) {
+            keep = '';
+            orderStatusFilter = '';
+        }
+        select.val(keep);
+    }
+
+    function withinOrderStatus(order) {
+        return !orderStatusFilter || order.status === orderStatusFilter;
+    }
+
     function withinOrderPeriod(order) {
         if (!orderPeriodFrom && !orderPeriodTo) {
             return true;
@@ -272,6 +316,7 @@
 
                 await ref.get().then(async function (querySnapshot) {
                     populateOrderPeriods(querySnapshot);
+                    populateOrderStatuses(querySnapshot);
                     if (querySnapshot.empty) {
                         $('.total_count').text(0);
                         $('#data-table_processing').hide(); // Hide loader
@@ -293,6 +338,9 @@
                         childData.id = doc.id; // Ensure the document ID is included in the data
 
                         if (!withinOrderPeriod(childData)) {
+                            return;
+                        }
+                        if (!withinOrderStatus(childData)) {
                             return;
                         }
 
@@ -452,6 +500,11 @@
             });
         }
 
+        $(document).on('change', '#order_status_filter', function () {
+            orderStatusFilter = $(this).val() || '';
+            table.draw();
+        });
+
         $(document).on('change', '#order_period', function () {
             var value = $(this).val();
             $('#order_period_custom').toggle(value === 'custom');
@@ -494,6 +547,7 @@
 
         $(document).on('click', '#order_history_print', function () {
             $('#print_store').text(currentStoreTitle || $('.card-header-title h3').text() || 'Store');
+            $('#print_status').text(orderStatusFilter || "{{ trans('lang.order_history_status_all') }}");
             $('#print_period').text(orderPeriodLabel !== ''
                 ? orderPeriodLabel
                 : "{{ trans('lang.order_history_period_all') }}");
