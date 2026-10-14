@@ -411,6 +411,12 @@
         isCommissionEnabled = adminCommissionSettings?.enable || false;
         commissionType = adminCommissionSettings?.type || "percentage";
         commissionValue = parseFloat(adminCommissionSettings?.commission || 0);
+        /* The global switch is the master of every commission - the store's
+           own rate and the section's (client, 14 Oct). */
+        if (!(await globalAdminCommissionOn())) {
+            isCommissionEnabled = false;
+            commissionValue = 0;
+        }
 
         // await clearCartAjax();
         await loadCategories();
