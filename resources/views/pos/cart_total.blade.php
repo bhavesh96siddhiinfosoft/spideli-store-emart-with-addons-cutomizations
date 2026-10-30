@@ -20,7 +20,11 @@
         $quantity = $item['quantity'] ?? 1;
 
         // Price for this cart item (base + extras) × quantity
-        $itemTotal = ($basePrice + $extrasPrice) * $quantity;
+        /* Point 68: each add-on at its own quantity; a legacy line once per unit. */
+    $addonsTotal = (is_array($item) && isset($item['addons']) && is_array($item['addons']))
+        ? array_sum(array_map(function ($a) { return (float) ($a['price'] ?? 0) * (int) ($a['quantity'] ?? 0); }, $item['addons']))
+        : (float) $extrasPrice * $quantity;
+    $itemTotal = $basePrice * $quantity + $addonsTotal;
         $itemSubtotal += $itemTotal;
 
         // Calculate admin commission on the item total

@@ -1249,6 +1249,11 @@ return [
     'order_history_status' => 'Status',
     'order_history_status_all' => 'All statuses',
     'order_history_print_status' => 'Status',
+    'addon_each' => 'each',
+    'addons_unavailable' => 'The add-ons could not be priced. Please try again.',
+    'addon_title_required' => 'Enter the add-on\'s title.',
+    'addon_title_duplicate' => 'This product already has an add-on with this title.',
+    'addon_price_invalid' => 'Enter the add-on\'s price: 0 or more (0 is a free add-on).',
 ];
 ?>
 

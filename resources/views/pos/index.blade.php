@@ -1075,22 +1075,7 @@
                     : currentCurrency + originalAddonPrice.toFixed(decimal_degits);
 
                 addonsHtml += `
-                    <div class="form-group row width-100 border-bottom p-0">
-                        <div class="form-check width-100 pl-0">
-                            <input 
-                                type="checkbox"
-                                class="form-check-input addon-checkbox"
-                                id="addon_${productId}_${i}"
-                                data-price="${originalAddonPrice}"
-                                value="${addonsTitle[i]}"
-                            >
-                            <label class="control-label d-flex justify-content-between w-100" 
-                                for="addon_${productId}_${i}">
-                                <span>${addonsTitle[i]}</span>
-                                <span>+${formattedPrice}</span>
-                            </label>
-                        </div>
-                    </div>
+                    ${posAddonRowHtml(addonsTitle[i], originalAddonPrice, formattedPrice)}
                 `;
             }
 
@@ -1500,18 +1485,13 @@
         let selectedAddons = [];
         let selectedAddonsTotal = 0;
 
-        $('.addon-checkbox:checked').each(function () {
-            let addonPrice = parseFloat($(this).data('price') || 0); // Already has commission applied
-
-            selectedAddons.push({
-                title: $(this).val(),
-                price: addonPrice
-            });
-
-            selectedAddonsTotal += addonPrice;
+        /* Point 68: [{name, quantity}]; the server prices each from the product. */
+        posModalAddons().forEach(function (a) {
+            selectedAddons.push({ name: a.name, title: a.name, quantity: a.quantity });
+            selectedAddonsTotal += a.price * a.quantity;
         });
 
-        let priceForSession = originalBasePrice + selectedAddonsTotal;
+        let priceForSession = originalBasePrice + selectedAddonsTotal / Math.max(1, parseInt(quantity) || 1);
         let totalPriceForSession = priceForSession * quantity;
 
         setCookie('deliveryChargemain', JSON.stringify(deliveryChargemain), 356);
@@ -1724,10 +1704,7 @@
         const rawPrice = parseFloat(matchedVariant.variant_price || 0);
         const variantPrice = rawPrice;
 
-        let addonTotal = 0;
-        $('.addon-checkbox:checked').each(function () {
-            addonTotal += parseFloat($(this).data('price') || 0);
-        });
+        let addonTotal = posModalAddonsSubtotal();   // point 68: each add-on x its own quantity
 
         let totalWithAddons =  parseFloat(addonTotal) +  parseFloat(variantPrice);
         
@@ -1849,6 +1826,14 @@
                     wholesaleMinQty: item.wholesale_min_qty ?? '',
                 };
 
+                /* Point 68: each add-on at its own quantity - addons, extras and
+                 * extras_price written the same way as the apps (writeAddons). The
+                 * commission goes on each add-on's unit price; a free add-on stays free. */
+                if (Array.isArray(item.addons)) {
+                    writeAddons(product, item.addons.map(function (a) {
+                        return { name: a.name, price: posAddonUnitPrice(a.price), quantity: parseInt(a.quantity, 10) || 0 };
+                    }));
+                }
                 if (item.variant_info) {
                     let variantInfo = item.variant_info;
                     if (typeof variantInfo === 'string') {
@@ -2062,7 +2047,7 @@
         for (let i = 0; i < products.length; i++) {
             let product = products[i];
             let basePrice = (product.discountPrice && parseFloat(product.discountPrice) > 0) ? parseFloat(product.discountPrice) : parseFloat(product.price);
-            let itemGross = (basePrice + parseFloat(product.extras_price || 0)) * parseInt(product.quantity);
+            let itemGross = basePrice * parseInt(product.quantity) + lineAddonsTotal(product);   // point 68
             order_subtotal += itemGross;
         }
 
@@ -2076,7 +2061,7 @@
             let itemCombinedTax = 0;
             products.forEach(product => {
                 let basePrice = (product.discountPrice && parseFloat(product.discountPrice) > 0) ? parseFloat(product.discountPrice) : parseFloat(product.price);
-                let itemGross = (basePrice + parseFloat(product.extras_price || 0)) * parseInt(product.quantity);
+                let itemGross = basePrice * parseInt(product.quantity) + lineAddonsTotal(product);   // point 68
                 let itemDiscount = (itemSubtotal > 0) ? (itemGross / itemSubtotal) * total_discount : 0;
                 let itemTaxable = Math.max(0, itemGross - itemDiscount);
                 let itemTaxes = product.taxSetting || [];
@@ -2214,7 +2199,7 @@
         }
     }
     
-    $(document).on('change', '.addon-checkbox', function () {
+    $(document).on('change', '.pos-addon-qty', function () {
 
         const productId = $('#modal-add-cart-btn').data('product-id');
         let basePrice = 0;
@@ -2236,10 +2221,7 @@
         }
         
 
-        let addonTotal = 0;
-        $('.addon-checkbox:checked').each(function () {
-            addonTotal += parseFloat($(this).data('price') || 0);
-        });
+        let addonTotal = posModalAddonsSubtotal();   // point 68: each add-on x its own quantity
 
         let finalPrice = basePrice + addonTotal;
      
@@ -2287,6 +2269,90 @@
             $('#user_detail_block').addClass('d-none');
         }
     });
+    /* ---- Point 68: add-ons at their own quantity -------------------- */
+    function posAddonRowHtml(name, price, formattedPrice) {
+        var safe = lineAddonEscape(name);
+        return '<div class="form-group row width-100 border-bottom p-0 py-2 pos-addon-row" data-name="' + safe + '" data-price="' + (parseFloat(price) || 0) + '">'
+            + '<div class="d-flex align-items-center w-100">'
+            + '<div class="mr-2"><div>' + safe + '</div><small class="text-muted">' + formattedPrice + ' {{ trans('lang.addon_each') }}</small>'
+            + '<small class="d-block pos-addon-subtotal"></small></div>'
+            + '<div class="ml-auto text-nowrap">'
+            + '<button type="button" class="btn btn-xs btn-secondary pos-addon-step" data-step="-1">-</button>'
+            + '<input type="text" inputmode="numeric" class="form-control d-inline-block text-center p-0 mx-1 pos-addon-qty" style="width:48px" value="0">'
+            + '<button type="button" class="btn btn-xs btn-secondary pos-addon-step" data-step="1">+</button>'
+            + '</div></div></div>';
+    }
+
+    function posModalAddons() {
+        var list = [];
+        $('#modal-addons-container .pos-addon-row').each(function () {
+            var qty = parseInt($(this).find('.pos-addon-qty').val(), 10) || 0;
+            if (qty > 0) {
+                list.push({ name: String($(this).attr('data-name')), price: parseFloat($(this).attr('data-price')) || 0, quantity: qty });
+            }
+        });
+        return list;
+    }
+
+    function posModalAddonsSubtotal() {
+        return posModalAddons().reduce(function (s, a) { return s + a.price * a.quantity; }, 0);
+    }
+
+    /* The commission on an add-on's unit price, as on the product's; 0 stays 0. */
+    function posAddonUnitPrice(basePrice) {
+        var base = parseFloat(basePrice) || 0;
+        return base > 0 ? applyCommission(base) : 0;
+    }
+
+    function posMoney(amount) {
+        amount = parseFloat(amount) || 0;
+        return currencyAtRight ? amount.toFixed(decimal_degits) + currentCurrency : currentCurrency + amount.toFixed(decimal_degits);
+    }
+
+    $(document).on('click', '.pos-addon-step', function () {
+        var row = $(this).closest('.pos-addon-row');
+        var input = row.find('.pos-addon-qty');
+        var qty = Math.max(0, (parseInt(input.val(), 10) || 0) + (parseInt($(this).attr('data-step'), 10) || 0));
+        input.val(qty).trigger('change');
+    });
+
+    $(document).on('input', '.pos-addon-qty', function () {
+        var clean = String($(this).val()).replace(/[^0-9]/g, '');
+        if (clean !== $(this).val()) {
+            $(this).val(clean);
+        }
+        $(this).trigger('change');
+    });
+
+    $(document).on('change', '.pos-addon-qty', function () {
+        var row = $(this).closest('.pos-addon-row');
+        var qty = parseInt($(this).val(), 10) || 0;
+        var unit = parseFloat(row.attr('data-price')) || 0;
+        row.find('.pos-addon-subtotal').text(qty > 0 ? qty + ' \u00d7 ' + posMoney(unit) + ' = ' + posMoney(unit * qty) : '');
+    });
+
+    /* A cart line's own add-on +/- (0 removes that add-on, never the line). */
+    $(document).on('click', '.pos-line-addon-step', function () {
+        var $b = $(this);
+        var quantity = Math.max(0, (parseInt($b.attr('data-qty'), 10) || 0) + (parseInt($b.attr('data-step'), 10) || 0));
+        $('.pos-line-addon-step').prop('disabled', true);
+        $.ajax({
+            url: '{{ route("cart.addon-update") }}',
+            type: 'POST',
+            data: { _token: '{{ csrf_token() }}', index: $b.attr('data-index'), name: $b.attr('data-name'), quantity: quantity },
+            success: function (res) {
+                $('#cart_list').html(res.html);
+                $('#cart_total').html(res.total);
+                if (typeof formatCartPrices === 'function') {
+                    formatCartPrices();
+                }
+            },
+            complete: function () {
+                $('.pos-line-addon-step').prop('disabled', false);
+            }
+        });
+    });
+
     function applyCommission(basePrice) {
         if (!isCommissionEnabled || isNaN(basePrice)) {
             return parseFloat(basePrice || 0);

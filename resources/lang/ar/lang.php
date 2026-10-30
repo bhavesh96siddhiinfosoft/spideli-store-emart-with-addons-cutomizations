@@ -1241,6 +1241,11 @@ return [
     'order_history_status' => 'الحالة',
     'order_history_status_all' => 'كل الحالات',
     'order_history_print_status' => 'الحالة',
+    'addon_each' => 'للواحدة',
+    'addons_unavailable' => 'تعذّر تسعير الإضافات. حاول مرة أخرى.',
+    'addon_title_required' => 'أدخل عنوان الإضافة.',
+    'addon_title_duplicate' => 'يحتوي هذا المنتج بالفعل على إضافة بهذا العنوان.',
+    'addon_price_invalid' => 'أدخل سعر الإضافة: 0 أو أكثر (0 تعني إضافة مجانية).',
 ];
 ?>
 
