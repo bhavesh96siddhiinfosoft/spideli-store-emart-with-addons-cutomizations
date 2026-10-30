@@ -299,8 +299,23 @@
                 }
             };
             var projectId = '<?php echo env('FIREBASE_PROJECT_ID'); ?>';
+            /* Point 84: deleteUser removes a login only for the account's owner
+             * (this store / provider), so the call says who is asking: the
+             * signed-in owner's Firebase ID token. Without it, it is refused. */
+            var authHeaders = {};
+            try {
+                var authUser = firebase.auth().currentUser || await new Promise(function (resolve) {
+                    var stop = firebase.auth().onAuthStateChanged(function (u) { stop(); resolve(u); });
+                });
+                if (authUser) {
+                    authHeaders.Authorization = 'Bearer ' + await authUser.getIdToken();
+                }
+            } catch (tokenError) {
+                console.error('The sign-in token is not available', tokenError);
+            }
             jQuery.ajax({
                 url: 'https://us-central1-' + projectId + '.cloudfunctions.net/deleteUser',
+                headers: authHeaders,
                 method: 'POST',
                 contentType: "application/json; charset=utf-8",
                 data: JSON.stringify(dataObject),
