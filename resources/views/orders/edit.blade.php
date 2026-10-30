@@ -1488,6 +1488,19 @@
                             'courierTrackingId': courierTrackingId,
                             ...cancellationFieldsForSave(orderStatus)
                         }).then(async function(result) {
+                            /* Point 83: a rejected prepaid order goes back to the
+                             * customer's wallet - before the notification, so a
+                             * failed push cannot stop it. */
+                            if (orderStatus == 'Order Rejected') {
+                                try {
+                                    var rejectedOrder = await database.collection('vendor_orders').doc(id).get();
+                                    if (rejectedOrder.exists) {
+                                        await spideliRefundOrderToWallet(Object.assign({ id: id }, rejectedOrder.data()));
+                                    }
+                                } catch (refundError) {
+                                    console.error('Point 83: the refund failed', refundError);
+                                }
+                            }
                             var subject = '';
                             var message = '';
                             if (orderStatus == "Order Completed" && orderTakeAwayOption ==
@@ -1603,45 +1616,7 @@
                                     },
                                     success: function(data) {
 
-                                        if (orderPreviousStatus != 'Order Rejected' && orderPreviousStatus != 'Driver Rejected' && orderPaymentMethod != 'cod' && orderTakeAwayOption == false) {
-                                            if (orderStatus == 'Order Rejected' || orderStatus == 'Driver Rejected' ) {
-                                                var walletId = database.collection('temp').doc().id;
-                                                database.collection('wallet').doc(walletId).set({
-                                                        'amount': parseFloat(orderPaytableAmount),
-                                                        'date': firebase.firestore.FieldValue.serverTimestamp(),
-                                                        'id': walletId,
-                                                        'note': 'Cancelled Order Payment',
-                                                        'order_id': oid,
-                                                        'payment_method': 'Wallet',
-                                                        'payment_status': 'success',
-                                                        'transactionUser': 'user',
-                                                        'user_id': orderCustomerId,
-                                                    }).then(function(result) {
-                                                        database.collection('users').where("id","==",orderCustomerId).get().then(async function(userSnapshots) {
-                                                            if (userSnapshots.docs.length > 0) {
-                                                                data = userSnapshots.docs[0].data();
-                                                                var wallet_amount = 0;
-                                                                if (data .wallet_amount != undefined && data .wallet_amount != '' && data .wallet_amount != null && !isNaN(data.wallet_amount)) {
-                                                                    wallet_amount = parseFloat(data.wallet_amount);
-                                                                }
-                                                                var newWalletAmount = wallet_amount + parseFloat(orderPaytableAmount);
-                                                                database.collection('users').doc(orderCustomerId).update({
-                                                                    'wallet_amount': parseFloat(newWalletAmount)
-                                                                }).then(function(result) {
-                                                                    window.location.href = '{{ route('orders') }}';
-                                                                })
-                                                                
-                                                            } else {
-                                                                window.location.href = '{{ route('orders') }}';
-                                                            }
-                                                        });
-                                                    })
-                                            } else {
-                                                window.location.href = '{{ route('orders') }}';
-                                            }
-                                        } else {
-                                            window.location.href = '{{ route('orders') }}';
-                                        }
+                                        window.location.href = '{{ route('orders') }}';
                                     }
                                 });
 
@@ -1659,44 +1634,7 @@
                                         'message': message,
                                     },
                                     success: function(data) {
-                                        if (orderPreviousStatus != 'Order Rejected' && orderPreviousStatus != 'Driver Rejected' && orderPaymentMethod != 'cod' && orderTakeAwayOption == false) {
-                                            if (orderStatus == 'Order Rejected' || orderStatus == 'Driver Rejected') {
-                                                var walletId = database.collection('temp').doc().id;
-                                                database.collection('wallet').doc(walletId).set({
-                                                    'amount': parseFloat(orderPaytableAmount),
-                                                    'date': firebase.firestore.FieldValue.serverTimestamp(),
-                                                    'id': walletId,
-                                                    'note': 'Cancelled Order Payment',
-                                                    'order_id': oid,
-                                                    'payment_method': 'Wallet',
-                                                    'payment_status': 'success',
-                                                    'transactionUser': 'user',
-                                                    'user_id': orderCustomerId,
-                                                }).then(function(result) {
-                                                        database.collection('users').where("id", "==", orderCustomerId).get().then(async function(userSnapshots) {
-                                                            if (userSnapshots.docs.length > 0) {
-                                                                 data = userSnapshots.docs[0].data();
-                                                                var wallet_amount = 0;
-                                                                if (data.wallet_amount != undefined && data.wallet_amount != '' && data.wallet_amount != null && !isNaN(data.wallet_amount)) {
-                                                                    wallet_amount = parseFloat(data.wallet_amount);
-                                                                }
-                                                                var newWalletAmount = wallet_amount + parseFloat(orderPaytableAmount);
-                                                                database.collection('users').doc(orderCustomerId).update({
-                                                                    'wallet_amount': parseFloat(newWalletAmount)
-                                                                }).then(function(result) {
-                                                                    window.location.href = '{{ route('orders') }}';
-                                                                })
-                                                            } else {
-                                                                window.location.href = '{{ route('orders') }}';
-                                                            }
-                                                        });
-                                                    })
-                                            } else {
-                                                window.location.href = '{{ route('orders') }}';
-                                            }
-                                        } else {
-                                            window.location.href = '{{ route('orders') }}';
-                                        }
+                                        window.location.href = '{{ route('orders') }}';
                                     }
                                 });
                             }
@@ -2371,39 +2309,11 @@
                             note: 'Order tax refunded to customer'
                         });
                     }
-                    if (orderData.payment_method !== 'cod') {
-                        deliveryCharge = parseFloat(orderData.deliveryCharge || 0);
-                        tipAmount = parseFloat(orderData.tip_amount || 0);
-                        customerAmount = parseFloat(deliveryCharge) + parseFloat(tipAmount) + parseFloat(vendorAmount) + parseFloat(adminCommissionValue);
-
-                        const customerDoc = await database.collection('users').doc(customerId).get();
-                        if (customerDoc.exists) {
-                            const customerData = customerDoc.data();
-                            customerFcm = customerData.fcmToken || '';
-                            const customerWallet = parseFloat(customerData.wallet_amount || 0);
-                            const finalWalletAmount = parseFloat((customerWallet + customerAmount).toFixed(2));
-                            await customerDoc.ref.update({
-                                wallet_amount: finalWalletAmount
-                            });
-                        }
-                        const walletId = database.collection("tmp").doc().id;
-                        await database.collection('wallet').doc(walletId).set({
-                            amount: customerAmount,
-                            date: firebase.firestore.FieldValue.serverTimestamp(),
-                            id: walletId,
-                            isTopUp: true,
-                            order_id: orderData.id,
-                            payment_method: "Wallet",
-                            payment_status: 'success',
-                            user_id: customerId,
-                            transactionUser: 'customer',
-                            note: 'Order amount refunded'
-                        });
-                    } else {
-                        const customerDoc = await database.collection('users').doc(customerId).get();
-                        if (customerDoc.exists) {
-                            customerFcm = customerDoc.data().fcmToken || '';
-                        }
+                    /* Point 83: what the customer paid, once (layouts/app). */
+                    await spideliRefundOrderToWallet(Object.assign({ id: snapshot.docs[0].id }, orderData));
+                    const customerDoc = await database.collection('users').doc(customerId).get();
+                    if (customerDoc.exists) {
+                        customerFcm = customerDoc.data().fcmToken || '';
                     }
                     if (orderData.hasOwnProperty('driverID') && orderData.driverID != null && orderData.driverID != '') {
                         await database.collection('users').doc(orderData.driverID).get().then(async function(snapshot) {
