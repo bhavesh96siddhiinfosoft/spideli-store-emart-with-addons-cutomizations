@@ -501,6 +501,7 @@
         var sectionId = "";
         var packagingChargeEnable = false;
         var orderBasePrice = 0;
+        var pscBase = 0;   // point 87: the earnings base the commission is taken on
         subscriptionBusinessModel.get().then(async function(snapshots) {
             var subscriptionSetting = snapshots.data();
             if (subscriptionSetting.subscription_model == true) {
@@ -1186,6 +1187,13 @@
                                      * it belongs to. */
                                     await applyVendorWalletDelta(vendorId, vendorAuthor,
                                         vendorAmount + parseFloat(total_tax_amount));
+                                    /* Point 87: taken after the credit; the store's two balances move
+                                     * through applyVendorWalletDelta, as the credit's do. */
+                                    var pscTaken = await takeProductServiceCommission({ collection: 'vendor_orders', orderId: id,
+                                        base: pscBase, userId: vendorAuthor, transactionUser: 'vendor' });
+                                    if (pscTaken > 0) {
+                                        await applyVendorWalletDelta(vendorId, vendorAuthor, -pscTaken);
+                                    }
 
                                     callAjax(orderStatus);
                                 } else {
@@ -2081,6 +2089,7 @@
             // orderBasePrice = (basePrice - total_discount ) + packagingCharge;
             // orderRefundPrice = order_subtotal + deliveryCharge + tip_amount + packagingCharge + platformFee + orderTaxAmountCustomer;
             orderBasePrice = (basePrice - total_discount ) + (packagingChargeEnable ? packagingCharge : 0);
+            pscBase = Math.max(0, basePrice - total_discount);   // point 87: no packaging, tax or delivery
             orderRefundPrice = order_subtotal + deliveryCharge + tip_amount + (packagingChargeEnable ? packagingCharge : 0) + platformFee + orderTaxAmountCustomer;
 
             if (currencyAtRight) {
@@ -2090,6 +2099,7 @@
             }
             html = html + '<tr><td class="label"><small>{{ trans('lang.admin_commission') }} ' + adminCommHtml +
                 '</small> </td><td style="color:red"><small>( ' + adminCommission_val + ' )</small></td></tr>';
+            html = html + productServiceCommissionRow(snapshotsProducts, {!! json_encode(trans('lang.psc_title')) !!}, function (a) { return currencyAtRight ? parseFloat(a).toFixed(decimal_degits) + currentCurrency : currentCurrency + parseFloat(a).toFixed(decimal_degits); });   // point 87
             if (notes) {
                 html = html + '<tr><td class="label">{{ trans('lang.notes') }}</td><td class="adminCommission_val">' +
                     notes + '</td></tr>';

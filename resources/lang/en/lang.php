@@ -1254,6 +1254,7 @@ return [
     'addon_title_required' => 'Enter the add-on\'s title.',
     'addon_title_duplicate' => 'This product already has an add-on with this title.',
     'addon_price_invalid' => 'Enter the add-on\'s price: 0 or more (0 is a free add-on).',
+    'psc_title' => 'Admin Product & Service Commission',
 ];
 ?>
 
