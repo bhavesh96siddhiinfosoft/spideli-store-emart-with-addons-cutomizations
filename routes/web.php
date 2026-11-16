@@ -51,6 +51,8 @@ Route::post('process-mercadopago', [App\Http\Controllers\SubscriptionController:
 
 
 Route::get('success', [App\Http\Controllers\SubscriptionController::class, 'success'])->name('success');
+// #92 MyCoolPay: the customer comes back here (forwarded by the website's MyCoolPay return page).
+Route::get('mycoolpay/return/{result}', [App\Http\Controllers\MyCoolPayController::class, 'back'])->where('result', 'success|cancel|failure')->name('mycoolpay.return');
 
 Route::get('failed', [App\Http\Controllers\SubscriptionController::class, 'failed'])->name('failed');
 

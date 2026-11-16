@@ -252,6 +252,22 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        {{-- #92 MyCoolPay: shown below when enabled and the currency is XAF --}}
+                                        <div class="col-md-4 d-none" id="mycoolpay_box">
+                                            <div class="pay-method-box d-flex align-items-center">
+                                                <div class="pay-method-icon">
+                                                    <i class="fa fa-mobile" style="font-size:28px"></i>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input type="radio" id="mycoolpay" name="payment_method"
+                                                        value="mycoolpay">
+                                                    {{ trans('lang.mycoolpay') }} <label class="control-label mb-0"
+                                                        for="mycoolpay"></label>
+                                                </div>
+                                                <div class="input-box">
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div class="col-md-4 d-none" id="xendit_box">
                                             <div class="pay-method-box d-flex align-items-center">
                                                 <div class="pay-method-icon">
@@ -730,6 +746,29 @@
                 }
             });
 
+            /* #92 MyCoolPay: offered when enabled, with a public key, for a store paying in XAF
+             * (or EUR when the admin allows it). */
+            database.collection('settings').doc('mycoolpay_settings').get().then(async function (doc) {
+                var d = doc.exists ? doc.data() : null;
+                if (!(d && (d.isEnabled === true || d.enable === true) && d.publicKey)) {
+                    return;
+                }
+                var allowed = String(d.currency || 'XAF').toUpperCase() === 'EUR' ? ['XAF', 'EUR'] : ['XAF'];
+                try {
+                    var snap = await refCurrency.get();
+                    var cur = snap.docs.length ? snap.docs[0].data() : null;
+                    var code = cur && cur.code ? String(cur.code).toUpperCase() : '';
+                    if (code !== '' && allowed.indexOf(code) === -1) {
+                        return;
+                    }
+                } catch (e) {
+                    console.error('MyCoolPay: currency unknown', e);
+                }
+                $("#mycoolpay_box").removeClass('d-none');
+            }).catch(function (e) {
+                console.error('MyCoolPay settings could not be read', e);
+            });
+
             OrangePaySettings.get().then(async function(OrangePaySettingsSnapshots) {
                 OrangePaySetting = OrangePaySettingsSnapshots.data();
                 if (OrangePaySetting.enable) {
@@ -1066,7 +1105,7 @@
                     }
                 });
 
-            } else if (payment_method == "orangepay") {
+            } else if ((payment_method == "orangepay" || payment_method == "mycoolpay")) {
 
                 var orangepay_enable = $("#orangepay_enable").val();
                 var orangepay_auth = $("#orangepay_auth").val();

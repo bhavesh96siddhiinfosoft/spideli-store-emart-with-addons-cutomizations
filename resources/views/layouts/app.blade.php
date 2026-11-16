@@ -746,6 +746,15 @@
 
         </script>
 
+        @if (session('mycoolpay_error'))
+        <script>
+            /* #92: why a MyCoolPay payment did not start or was not accepted. */
+            (function (msg) {
+                var show = function () { if (window.Swal) { Swal.fire({icon: 'error', text: msg}); } else { alert(msg); } };
+                if (document.readyState === 'complete') { show(); } else { window.addEventListener('load', show); }
+            })({!! json_encode((string)session('mycoolpay_error')) !!});
+        </script>
+        @endif
         @yield('scripts')
 
         <script type="text/javascript">
