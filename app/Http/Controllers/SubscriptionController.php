@@ -182,6 +182,17 @@ class SubscriptionController extends Controller
                     return redirect()->route('subscription-plan.show')->with('mycoolpay_error', $e->getMessage());
                 }
             }
+            else if ($cart['cart_order']['payment_method'] == 'pispi') {
+                // #92: PI-SPI (App\Services\PiSpi): this panel's page takes the owner's alias; the credentials stay on the server.
+                try {
+                    return redirect(\App\Services\PiSpi::start('subscription', $cart['cart_order']['total_pay'],
+                        $cart['cart_order']['currencyData']['code'] ?? '', 'Spideli subscription',
+                        ['name' => \Illuminate\Support\Facades\Auth::user()->name ?? '', 'email' => \Illuminate\Support\Facades\Auth::user()->email ?? ''],
+                        route('success'), route('subscription-plan.show')));
+                } catch (\Throwable $e) {
+                    return redirect()->route('subscription-plan.show')->with('mycoolpay_error', $e->getMessage());
+                }
+            }
             else if ($cart['cart_order']['payment_method'] == 'midtrans') {
                 $midtrans_enable = $cart['cart_order']['midtrans_enable'];
                 $midtrans_serverKey = $cart['cart_order']['midtrans_serverKey'];
@@ -508,6 +519,15 @@ class SubscriptionController extends Controller
         if (isset($_GET['sebpay_token'])) {
             $sebpay_paid = \App\Services\Sebpay::confirmed($_GET['sebpay_token'], 'subscription');   // #92: proven with Sebpay (session approved)
             if ($sebpay_paid) {
+                $cart['payment_status'] = true;
+                Session::put('cart', $cart);
+                Session::put('success', 'Payment successful');
+                Session::save();
+            }
+        }
+        if (isset($_GET['pispi_token'])) {
+            $pispi_paid = \App\Services\PiSpi::confirmed($_GET['pispi_token'], 'subscription');   // #92: proven with PI-SPI (request IRREVOCABLE)
+            if ($pispi_paid) {
                 $cart['payment_status'] = true;
                 Session::put('cart', $cart);
                 Session::put('success', 'Payment successful');

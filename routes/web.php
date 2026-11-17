@@ -57,6 +57,11 @@ Route::get('mycoolpay/return/{result}', [App\Http\Controllers\MyCoolPayControlle
 Route::get('mypvit/return/{result}', [App\Http\Controllers\MyPVitController::class, 'back'])->where('result', 'success|failure')->name('mypvit.return');
 // #92 Sebpay: this panel's return page, sent to Sebpay with each payment.
 Route::get('sebpay/{country}/return', [App\Http\Controllers\SebpayController::class, 'back'])->where('country', 'cm|gn')->name('sebpay.return');
+// #92 PI-SPI: this panel's page for the owner's alias, then the status check.
+Route::get('pispi/pay', [App\Http\Controllers\PiSpiController::class, 'pay'])->name('pispi.pay');
+Route::post('pispi/request', [App\Http\Controllers\PiSpiController::class, 'request'])->middleware('throttle:20,1')->name('pispi.request');
+Route::get('pispi/status', [App\Http\Controllers\PiSpiController::class, 'status'])->middleware('throttle:60,1')->name('pispi.status');
+Route::get('pispi/cancel', [App\Http\Controllers\PiSpiController::class, 'cancel'])->name('pispi.cancel');
 
 Route::get('failed', [App\Http\Controllers\SubscriptionController::class, 'failed'])->name('failed');
 
