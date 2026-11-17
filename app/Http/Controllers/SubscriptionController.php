@@ -149,6 +149,17 @@ class SubscriptionController extends Controller
                     return redirect()->route('subscription-plan.show')->with('mycoolpay_error', $e->getMessage());
                 }
             }
+            else if ($cart['cart_order']['payment_method'] == 'mypvit') {
+                // #92: MyPVIT (App\Services\MyPVit); the secret key and password stay on the server.
+                try {
+                    return redirect()->away(\App\Services\MyPVit::start('subscription', $cart['cart_order']['total_pay'],
+                        $cart['cart_order']['currencyData']['code'] ?? '', 'Spideli subscription',
+                        ['name' => \Illuminate\Support\Facades\Auth::user()->name ?? '', 'email' => \Illuminate\Support\Facades\Auth::user()->email ?? ''],
+                        route('success'), route('subscription-plan.show')));
+                } catch (\Throwable $e) {
+                    return redirect()->route('subscription-plan.show')->with('mycoolpay_error', $e->getMessage());
+                }
+            }
             else if ($cart['cart_order']['payment_method'] == 'midtrans') {
                 $midtrans_enable = $cart['cart_order']['midtrans_enable'];
                 $midtrans_serverKey = $cart['cart_order']['midtrans_serverKey'];
@@ -457,6 +468,15 @@ class SubscriptionController extends Controller
         if (isset($_GET['mycoolpay_token'])) {
             $mycoolpay_paid = \App\Services\MyCoolPay::confirmed($_GET['mycoolpay_token'], 'subscription');   // #92: proven with MyCoolPay
             if ($mycoolpay_paid) {
+                $cart['payment_status'] = true;
+                Session::put('cart', $cart);
+                Session::put('success', 'Payment successful');
+                Session::save();
+            }
+        }
+        if (isset($_GET['mypvit_token'])) {
+            $mypvit_paid = \App\Services\MyPVit::confirmed($_GET['mypvit_token'], 'subscription');   // #92: proven with PVit's status API (through the website)
+            if ($mypvit_paid) {
                 $cart['payment_status'] = true;
                 Session::put('cart', $cart);
                 Session::put('success', 'Payment successful');

@@ -268,6 +268,22 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        {{-- #92 MyPVIT: shown below when enabled, set up, and the currency is XAF --}}
+                                        <div class="col-md-4 d-none" id="mypvit_box">
+                                            <div class="pay-method-box d-flex align-items-center">
+                                                <div class="pay-method-icon">
+                                                    <i class="fa fa-mobile" style="font-size:28px"></i>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input type="radio" id="mypvit" name="payment_method"
+                                                        value="mypvit">
+                                                    {{ trans('lang.mypvit') }} <label class="control-label mb-0"
+                                                        for="mypvit"></label>
+                                                </div>
+                                                <div class="input-box">
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div class="col-md-4 d-none" id="xendit_box">
                                             <div class="pay-method-box d-flex align-items-center">
                                                 <div class="pay-method-icon">
@@ -746,6 +762,27 @@
                 }
             });
 
+            /* #92 MyPVIT: offered when enabled and set up, for a store paying in XAF. */
+            database.collection('settings').doc('mypvit_settings').get().then(async function (doc) {
+                var d = doc.exists ? doc.data() : null;
+                if (!(d && (d.isEnabled === true || d.enable === true) && d.accountCode && d.linkCode && d.callbackCode && d.successUrl)) {
+                    return;
+                }
+                try {
+                    var snap = await refCurrency.get();
+                    var cur = snap.docs.length ? snap.docs[0].data() : null;
+                    var code = cur && cur.code ? String(cur.code).toUpperCase() : '';
+                    if (code !== '' && code !== 'XAF') {
+                        return;
+                    }
+                } catch (e) {
+                    console.error('MyPVIT: currency unknown', e);
+                }
+                $("#mypvit_box").removeClass('d-none');
+            }).catch(function (e) {
+                console.error('MyPVIT settings could not be read', e);
+            });
+
             /* #92 MyCoolPay: offered when enabled, with a public key, for a store paying in XAF
              * (or EUR when the admin allows it). */
             database.collection('settings').doc('mycoolpay_settings').get().then(async function (doc) {
@@ -1105,7 +1142,7 @@
                     }
                 });
 
-            } else if ((payment_method == "orangepay" || payment_method == "mycoolpay")) {
+            } else if ((payment_method == "orangepay" || payment_method == "mycoolpay" || payment_method == "mypvit")) {
 
                 var orangepay_enable = $("#orangepay_enable").val();
                 var orangepay_auth = $("#orangepay_auth").val();
