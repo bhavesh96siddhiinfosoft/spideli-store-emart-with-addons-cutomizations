@@ -55,6 +55,8 @@ Route::get('success', [App\Http\Controllers\SubscriptionController::class, 'succ
 Route::get('mycoolpay/return/{result}', [App\Http\Controllers\MyCoolPayController::class, 'back'])->where('result', 'success|cancel|failure')->name('mycoolpay.return');
 // #92 MyPVIT: the customer comes back here (forwarded by the website's /mypvit/return, after its /mypvit/handoff).
 Route::get('mypvit/return/{result}', [App\Http\Controllers\MyPVitController::class, 'back'])->where('result', 'success|failure')->name('mypvit.return');
+// #92 Sebpay: this panel's return page, sent to Sebpay with each payment.
+Route::get('sebpay/{country}/return', [App\Http\Controllers\SebpayController::class, 'back'])->where('country', 'cm|gn')->name('sebpay.return');
 
 Route::get('failed', [App\Http\Controllers\SubscriptionController::class, 'failed'])->name('failed');
 
