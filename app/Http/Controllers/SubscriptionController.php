@@ -171,6 +171,17 @@ class SubscriptionController extends Controller
                     return redirect()->route('subscription-plan.show')->with('mycoolpay_error', $e->getMessage());
                 }
             }
+            else if ($cart['cart_order']['payment_method'] == 'sebpay_gn') {
+                // #92: Sebpay Guinée (App\Services\Sebpay); the keys stay on the server.
+                try {
+                    return redirect()->away(\App\Services\Sebpay::start('gn', 'subscription', $cart['cart_order']['total_pay'],
+                        $cart['cart_order']['currencyData']['code'] ?? '', 'Spideli subscription',
+                        ['name' => \Illuminate\Support\Facades\Auth::user()->name ?? '', 'email' => \Illuminate\Support\Facades\Auth::user()->email ?? ''],
+                        route('success'), route('subscription-plan.show')));
+                } catch (\Throwable $e) {
+                    return redirect()->route('subscription-plan.show')->with('mycoolpay_error', $e->getMessage());
+                }
+            }
             else if ($cart['cart_order']['payment_method'] == 'midtrans') {
                 $midtrans_enable = $cart['cart_order']['midtrans_enable'];
                 $midtrans_serverKey = $cart['cart_order']['midtrans_serverKey'];
