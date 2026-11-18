@@ -801,6 +801,10 @@
             ownerPhoto = userData.profilePictureURL
             vendorOwnerPhoto = userData.profilePictureURL;
             $(".user_first_name").val(userData.firstName);
+            if (userData.isDocumentVerify === true) {
+                $(".headerText").find('.spideli-verified-badge').remove();
+                $(".headerText").append(spideliVerifiedBadge(true));
+            }
             $(".user_last_name").val(userData.lastName);
             if (userData.hasOwnProperty('email') && userData.email != null && userData.email != '') {
                 $(".user_email").val(userData.email).attr('readonly', true);

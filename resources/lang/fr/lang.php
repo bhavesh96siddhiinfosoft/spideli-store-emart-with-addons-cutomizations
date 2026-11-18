@@ -1237,4 +1237,5 @@ Ratio d’image : 2:1',
     'addon_title_duplicate' => 'Ce produit possède déjà un supplément portant ce nom.',
     'addon_price_invalid' => 'Saisissez le prix du supplément : 0 ou plus (0 correspond à un supplément gratuit).',
     'psc_title' => 'Commission admin sur produits et services',
+    'verified' => 'Vérifié',
 ];

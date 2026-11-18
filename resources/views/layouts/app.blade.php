@@ -2317,6 +2317,16 @@
                 }
             }, 250);
         }
+
+        /* Point #111: green "Verified" badge helper (#0FBF00). */
+        function spideliVerifiedBadge(isVerified, title) {
+            if (!isVerified) {
+                return '';
+            }
+            var label = title || "{{ trans('lang.verified') }}";
+            var safe = String(label).replace(/"/g, '&quot;');
+            return ' <i class="mdi mdi-verified spideli-verified-badge" data-toggle="tooltip" title="' + safe + '" data-bs-original-title="' + safe + '" style="color:#0FBF00;font-size:16px;vertical-align:middle;margin-left:4px;border:0;width:auto;height:auto;padding:0;display:inline-block;"></i>';
+        }
         </script>
     </body>
 
