@@ -27,11 +27,12 @@ class AdvertPaymentController extends Controller
     {
         try {
             $q = AdvertPayment::quote($id, $this->userId());
-            $methods = AdvertPayment::methods($q);
+            $options = AdvertPayment::options($q);   // every method of the region, usable or not yet
         } catch (\Throwable $e) {
             return $this->result(false, $this->message($e), $id);
         }
-        return view('advertisements.pay', ['q' => $q, 'methods' => $methods, 'error' => session('adv_pay_error')]);
+        $methods = array_map(function ($o) { return $o['label']; }, array_filter($options, function ($o) { return $o['usable']; }));
+        return view('advertisements.pay', ['q' => $q, 'options' => $options, 'methods' => $methods, 'error' => session('adv_pay_error')]);
     }
 
     public function pay(Request $request, $id)
@@ -67,7 +68,7 @@ class AdvertPaymentController extends Controller
         if (($c['status'] ?? '') === 'completed') {
             return $this->result(true, trans('lang.adv_pay_done'), $adId);
         }
-        $paid = AdvertPayment::proof((string)($c['method'] ?? ''), $request->query());
+        $paid = AdvertPayment::proof((string)($c['method'] ?? ''), $request->query(), $c + ['id' => $id]);
         if (!$paid) {
             return $this->result(false, trans('lang.adv_pay_not_confirmed'), $adId);
         }
@@ -80,6 +81,32 @@ class AdvertPaymentController extends Controller
             return $this->result(false, trans('lang.adv_pay_paid_not_done'), $adId);
         }
         return $this->result(true, trans('lang.adv_pay_done'), $adId);
+    }
+
+    /** Razorpay: the page that opens Razorpay Checkout for the checkout's order (key id only; the secret stays here). */
+    public function razorpay($id)
+    {
+        $userId = $this->userId();
+        try {
+            $c = AdvertPayment::loadCheckout($id, $userId);
+        } catch (\Throwable $e) {
+            return $this->result(false, trans('lang.adv_pay_unknown'), null);
+        }
+        $adId = (string)($c['advertisementId'] ?? '');
+        if (($c['status'] ?? '') === 'completed') {
+            return $this->result(true, trans('lang.adv_pay_done'), $adId);
+        }
+        $s = AdvertPayment::settings('razorpay');
+        if (($c['method'] ?? '') !== 'razorpay' || ($c['status'] ?? '') !== 'paying' || empty($c['gatewayOrderId'])
+            || !\App\Services\RazorpayCheckout::ready($s)) {
+            return $this->result(false, trans('lang.adv_pay_failed'), $adId);
+        }
+        return view('advertisements.pay_razorpay', [
+            'checkout' => $c, 'checkoutId' => $id, 'adId' => $adId,
+            'key' => trim((string)$s['razorpayKey']),
+            'amountMinor' => \App\Services\RazorpayCheckout::minor($c['amount'], $c['currency']),
+            'customer' => ['name' => Auth::user()->name ?? '', 'email' => Auth::user()->email ?? ''],
+        ]);
     }
 
     public function failed($id)

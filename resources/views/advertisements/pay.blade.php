@@ -30,32 +30,67 @@
         <div class="row justify-content-center">
             <div class="col-lg-7">
                 <div class="card border">
-                    <div class="card-header bg-white"><h3 class="mb-0">{{ $ad['title'] ?? '' }}</h3></div>
+                    <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                        <h3 class="mb-0">{{ $ad['title'] ?? '' }}</h3>
+                        <span class="badge badge-success py-2 px-3">{{ trans('lang.approved') }}</span>
+                    </div>
                     <div class="card-body">
-                        <p class="mb-1"><strong>{{ trans('lang.duration') }}:</strong>
-                            {{ ($ad['startDate'] ?? null) instanceof \DateTimeInterface ? $ad['startDate']->format('d M Y') : '' }} -
-                            {{ ($ad['endDate'] ?? null) instanceof \DateTimeInterface ? $ad['endDate']->format('d M Y') : '' }}</p>
-                        <p class="mb-1"><strong>{{ trans('lang.adv_pay_days') }}:</strong> {{ $q['days'] }} × {{ $money($q['pricePerDay']) }} {{ trans('lang.adv_pay_per_day') }}</p>
+                        {{-- #113: the advert in full before paying --}}
+                        @php
+                            $img = ($ad['type'] ?? '') === 'restaurant_promotion' ? (string)($ad['profileImage'] ?? '') : '';
+                            $storeName = (string)($q['store']['title'] ?? '');
+                            $fmt = function ($d) { return $d instanceof \DateTimeInterface ? $d->format('d M Y') : ''; };
+                        @endphp
+                        <div class="d-flex align-items-start mb-3 adv-pay-details">
+                            @if($img !== '' && stripos($img, 'https://') === 0)
+                                <img src="{{ $img }}" alt="" width="80" height="80" class="rounded mr-3" style="object-fit:cover;">
+                            @endif
+                            <div class="flex-grow-1">
+                                @if(!empty($ad['description']))
+                                    <p class="text-muted mb-2">{{ $ad['description'] }}</p>
+                                @endif
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tr><th class="pl-0" style="width:40%">{{ trans('lang.adv_store') }}</th>
+                                        <td>{{ $storeName }}{{ $q['regionName'] !== '' ? ' · ' . $q['regionName'] : '' }}</td></tr>
+                                    @if($q['zoneName'] !== '')
+                                        <tr><th class="pl-0">{{ trans('lang.adv_zone') }}</th><td>{{ $q['zoneName'] }}</td></tr>
+                                    @endif
+                                    <tr><th class="pl-0">{{ trans('lang.advertisement_type') }}</th>
+                                        <td>{{ ($ad['type'] ?? '') === 'video_promotion' ? trans('lang.video_promotion') : trans('lang.restaurant_promotion') }}</td></tr>
+                                    <tr><th class="pl-0">{{ trans('lang.duration') }}</th>
+                                        <td>{{ $fmt($ad['startDate'] ?? null) }} - {{ $fmt($ad['endDate'] ?? null) }}</td></tr>
+                                    <tr><th class="pl-0">{{ trans('lang.adv_pay_days') }}</th>
+                                        <td>{{ $q['days'] }} × {{ $money($q['pricePerDay']) }} {{ trans('lang.adv_pay_per_day') }}</td></tr>
+                                </table>
+                            </div>
+                        </div>
                         <p class="h4 font-weight-bold my-3">{{ trans('lang.adv_pay_total') }}: <span class="adv_total">{{ $money($q['total']) }}</span></p>
-                        @if(!$methods)
-                            <div class="error_top"><p>{{ trans('lang.adv_pay_no_method') }}</p></div>
-                        @else
-                            <form method="POST" action="{{ route('advertisement-pay.pay', $q['adId']) }}">
-                                @csrf
-                                <h5 class="mt-3">{{ trans('lang.adv_pay_with') }}</h5>
-                                @foreach($methods as $key => $label)
-                                    <div class="form-check border rounded p-2 pl-5 mb-2">
-                                        <input class="form-check-input" type="radio" name="method" id="m_{{ $key }}" value="{{ $key }}" {{ $loop->first ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="m_{{ $key }}">{{ $label }}
-                                            @if($key === 'wallet')
-                                                <small class="text-muted ml-2">{{ trans('lang.adv_pay_balance', ['amount' => $money($q['balance'])]) }}</small>
-                                            @endif
-                                        </label>
-                                    </div>
-                                @endforeach
+                        {{-- #113: every payment method switched on and "Available in Regions" for the store's region
+                             (Settings > Payment Methods); one that cannot take the payment yet is shown greyed with why --}}
+                        @php $firstUsable = array_key_first($methods); @endphp
+                        <form method="POST" action="{{ route('advertisement-pay.pay', $q['adId']) }}">
+                            @csrf
+                            <h5 class="mt-3">{{ trans('lang.adv_pay_with') }}</h5>
+                            @foreach($options as $key => $o)
+                                <div class="form-check border rounded p-2 pl-5 mb-2 {{ $o['usable'] ? '' : 'bg-light text-muted' }}">
+                                    <input class="form-check-input" type="radio" name="method" id="m_{{ $key }}" value="{{ $key }}"
+                                        {{ $key === $firstUsable ? 'checked' : '' }} {{ $o['usable'] ? '' : 'disabled' }}>
+                                    <label class="form-check-label" for="m_{{ $key }}">{{ $o['label'] }}
+                                        @if($key === 'wallet')
+                                            <small class="text-muted ml-2">{{ trans('lang.adv_pay_balance', ['amount' => $money($q['balance'])]) }}</small>
+                                        @endif
+                                        @if(!$o['usable'])
+                                            <small class="ml-2 adv-pay-note">{{ $o['note'] }}</small>
+                                        @endif
+                                    </label>
+                                </div>
+                            @endforeach
+                            @if(!$methods)
+                                <div class="error_top"><p>{{ trans('lang.adv_pay_no_method') }}</p></div>
+                            @else
                                 <button type="submit" class="btn btn-primary btn-block mt-3">{{ trans('lang.adv_pay_button', ['amount' => $money($q['total'])]) }}</button>
-                            </form>
-                        @endif
+                            @endif
+                        </form>
                         <a class="d-block text-center mt-3" href="{{ route('advertisements.view', $q['adId']) }}">{{ trans('lang.adv_pay_back') }}</a>
                     </div>
                 </div>

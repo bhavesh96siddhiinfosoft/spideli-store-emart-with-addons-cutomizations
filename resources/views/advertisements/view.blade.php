@@ -83,19 +83,18 @@
                                 </div>
                             </div>
                             <div class="order_edit-genrl col-lg-5 col-md-12">
-                                <div class="card mt-4">
+                                {{-- #113: no top margin, so this card lines up with General Details --}}
+                                <div class="card">
                                     <div class="card-header bg-white">
                                         <h3>{{ trans('lang.advertisement_status') }}</h3>
                                     </div>
                                     <div class="card-body">
                                         <div class="order_detail-top-box">
                                             <div class="form-group row widt-100 gendetail-col">
+                                                {{-- #113: Pay now (approved, unpaid) or what was paid online, on the same line, after the badge --}}
                                                 <label class="col-12 control-label"><strong>{{ trans('lang.payment_status') }}:</strong>
-                                                    <span id="paymentStatus"></span></label>
-                                            </div>
-                                            {{-- #113: pay an approved advert, or what was paid online --}}
-                                            <div class="form-group row widt-100 gendetail-col adv-pay-row d-none">
-                                                <div class="col-12" id="advPayBox"></div>
+                                                    {{-- one wrapper: the theme makes every direct span of the label a block (.control-label > span) --}}
+                                                    <span class="d-flex align-items-center flex-wrap"><span id="paymentStatus"></span><span id="advPayBox" class="adv-pay-row d-none" style="margin-inline-start:12px;"></span></span></label>
                                             </div>
                                             <div class="form-group row widt-100 gendetail-col">
                                                 <label class="col-12 control-label"><strong>{{ trans('lang.status') }}:</strong>
@@ -108,6 +107,36 @@
                                             <div class="form-group row widt-100 gendetail-col d-none cancel-note-div">
                                                 <label class="col-12 control-label"><strong>{{ trans('lang.cancel_note') }}:</strong>
                                                     <span id="cancel_note" class="text-danger"></span></label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {{-- #113: the store this advert is for (an owner may have several stores), as on the admin advert page --}}
+                                <div class="card mt-5 adv-store-card d-none">
+                                    <div class="card-header bg-white">
+                                        <h3>{{ trans('lang.store_info') }}</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <a href="#" class="row align-items-center adv-store-link">
+                                            <div class="col-3">
+                                                <img src="" class="adv-store-img rounded-circle" alt="" width="70" height="70" style="object-fit:cover;">
+                                            </div>
+                                            <div class="col-9">
+                                                <h4 class="adv-store-title mb-0"></h4>
+                                            </div>
+                                        </a>
+                                        <div class="order_detail-top-box mt-3">
+                                            <div class="form-group row widt-100 gendetail-col adv-store-region-row d-none">
+                                                <label class="col-12 control-label"><strong>{{ trans('lang.region') }}:</strong>
+                                                    <span class="adv-store-region"></span></label>
+                                            </div>
+                                            <div class="form-group row widt-100 gendetail-col">
+                                                <label class="col-12 control-label"><strong>{{ trans('lang.phone') }}:</strong>
+                                                    <span class="adv-store-phone"></span></label>
+                                            </div>
+                                            <div class="form-group row widt-100 gendetail-col">
+                                                <label class="col-12 control-label"><strong>{{ trans('lang.address') }}:</strong>
+                                                    <span class="adv-store-address"></span></label>
                                             </div>
                                         </div>
                                     </div>
@@ -233,7 +262,47 @@
             }
             $('#advTitle').html(data.title);
             $('#advDesc').html(data.description);
+            spideliAdvStoreDetails(data.vendorId || data.vendor_id || '');   // #113
 
         })
+
+        /* #113: the Store Info card: the advert's store (photo, name linking to the store, region, phone, address).
+         * Everything read from Firestore goes in with .text() / attr(). */
+        async function spideliAdvStoreDetails(storeId) {
+            var $card = $('.adv-store-card');
+            if (!storeId) {
+                return;
+            }
+            try {
+                var snap = await database.collection('vendors').doc(storeId).get();
+                var store = snap.exists ? snap.data() : null;
+                $card.find('.adv-store-img').attr('src', (store && store.photo) ? store.photo : placeholderImage)
+                    .attr('onerror', null).on('error', function () { $(this).off('error').attr('src', placeholderImage); });
+                if (!store) {
+                    $card.find('.adv-store-title').text(@json(trans('lang.unknown')));
+                    $card.find('.adv-store-link').removeAttr('href');
+                    $card.removeClass('d-none');
+                    return;
+                }
+                $card.find('.adv-store-title').text(store.title || '');
+                $card.find('.adv-store-link').attr('href', '{{ route('stores.view', ':id') }}'.replace(':id', encodeURIComponent(storeId)));
+                $card.find('.adv-store-phone').text(String(store.phonenumber || ''));
+                $card.find('.adv-store-address').text(String(store.location || ''));
+                if (store.regionId && typeof store.regionId === 'string') {
+                    try {
+                        var region = await database.collection('regions').doc(store.regionId).get();
+                        if (region.exists && region.data().name) {
+                            $card.find('.adv-store-region').text(region.data().name);
+                            $card.find('.adv-store-region-row').removeClass('d-none');
+                        }
+                    } catch (e) {
+                        console.error('[adv store region]', e);
+                    }
+                }
+                $card.removeClass('d-none');
+            } catch (e) {
+                console.error('[adv store details]', e);
+            }
+        }
     </script>
 @endsection

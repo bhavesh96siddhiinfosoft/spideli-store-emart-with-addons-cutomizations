@@ -27,13 +27,16 @@ class AdvertPayment
     const ZERO_DECIMAL = ['XAF', 'XOF', 'GNF', 'RWF'];
     const ID = '/^[A-Za-z0-9_-]{6,64}$/';
     const REF = '/^[A-Za-z0-9_-]{1,64}$/';   // ids a document refers to (store, zone, region)
-    /** gateway => [settings document, label, currencies it takes] */
+    /** gateway => [settings document, label, currencies it takes (null: the gateway account decides)] */
     const GATEWAYS = [
         'mycoolpay' => ['mycoolpay_settings', 'MyCoolPay', ['XAF']],
         'mypvit' => ['mypvit_settings', 'MyPVIT', ['XAF']],
         'sebpay_cm' => ['sebpay_cm_settings', 'Sebpay Cameroun', ['XAF']],
         'sebpay_gn' => ['sebpay_gn_settings', 'Sebpay Guinée', ['GNF']],
         'pispi' => ['pispi_settings', 'PI-SPI', ['XOF']],
+        // #113 (26 Nov): the other gateways the admin sets per region, run and confirmed on the server
+        'flutterwave' => ['flutterWave', 'FlutterWave', null],
+        'razorpay' => ['razorpaySettings', 'Razorpay', null],
     ];
 
     /* ------------------------------------------------------------ REST */
@@ -202,32 +205,98 @@ class AdvertPayment
         if ($total <= 0) {
             throw new \RuntimeException(trans('lang.adv_pay_no_price'));
         }
+        $zone = null;
+        try {
+            $zone = self::get('zone/' . $zoneId);   // for the page only
+        } catch (\Throwable $e) {
+        }
         return ['ad' => $ad, 'adId' => $adId, 'store' => $store, 'storeId' => $storeId, 'ownerId' => (string)($store['author'] ?? ''),
             'zoneId' => $zoneId, 'regionId' => $regionId, 'days' => $days, 'pricePerDay' => round((float)$perDay, $d),
             'total' => $total, 'currency' => $code, 'currencyData' => $currency ?: [],
+            'regionName' => (string)($region['name'] ?? ''), 'zoneName' => (string)($zone['name'] ?? ''),
             'balance' => self::amount($store['wallet_amount'] ?? 0)];
     }
 
-    /** wallet (when the wallet is on) and each gateway on for the store's region that takes its currency. */
+    /** Settings > Payment Methods "Available in Regions": an empty list means every region. */
+    protected static function servesRegion(array $s, $regionId)
+    {
+        $regions = array_values(array_filter((array)($s['regionIds'] ?? [])));
+        return !$regions || in_array($regionId, $regions, true);
+    }
+
+    /**
+     * Every payment method of the admin's Settings > Payment Methods screens (as `App\Finance\Regions::GATEWAY_NAMES`
+     * in the admin): settings document => [our method key, label]. Which of them a store sees is NOT decided here: it
+     * is what the admin switched on and made "Available in Regions" for the store's region (see options()).
+     */
+    const PAYMENT_SETTINGS = [
+        'mycoolpay_settings' => ['mycoolpay', 'MyCoolPay'], 'mypvit_settings' => ['mypvit', 'MyPVIT'],
+        'sebpay_cm_settings' => ['sebpay_cm', 'Sebpay Cameroun'], 'sebpay_gn_settings' => ['sebpay_gn', 'Sebpay Guinée'],
+        'pispi_settings' => ['pispi', 'PI-SPI'], 'flutterWave' => ['flutterwave', 'FlutterWave'], 'razorpaySettings' => ['razorpay', 'Razorpay'],
+        'stripeSettings' => ['stripe', 'Stripe'], 'paypalSettings' => ['paypal', 'PayPal'], 'payStack' => ['paystack', 'Paystack'],
+        'MercadoPago' => ['mercadopago', 'MercadoPago'], 'xendit_settings' => ['xendit', 'Xendit'], 'midtrans_settings' => ['midtrans', 'MidTrans'],
+        'payFastSettings' => ['payfast', 'Payfast'], 'orange_money_settings' => ['orangepay', 'OrangePay'],
+    ];
+
+    /** Switched on, whatever the gateway calls its flag. */
+    protected static function switchedOn(array $s)
+    {
+        return ($s['isEnabled'] ?? null) === true || ($s['isEnable'] ?? null) === true || ($s['enable'] ?? null) === true;
+    }
+
+    /**
+     * The payment methods of the store's region, straight from Settings > Payment Methods: the wallet and every gateway
+     * that is switched on and "Available in Regions" for the region (an empty list = every region). Each comes with
+     * whether it can take this payment now:
+     *  - a gateway that can only take some currencies (MyCoolPay, MyPVIT, Sebpay, PI-SPI) and not the region's: left out
+     *    (the admin's own pages refuse that region for it);
+     *  - FlutterWave / Razorpay whose keys are not filled yet: shown, cannot pay yet ("not set up yet");
+     *  - a gateway whose advert payment is not built yet: shown, cannot pay yet.
+     * [key => ['label', 'usable' (bool), 'note' (why not usable, '')]]
+     */
+    public static function options(array $q)
+    {
+        $out = [];
+        $ws = self::get('settings/walletSettings') ?: [];
+        if (($ws['isEnabled'] ?? null) === true && self::servesRegion($ws, $q['regionId'])) {
+            $out['wallet'] = ['label' => trans('lang.adv_pay_wallet'), 'usable' => true, 'note' => ''];
+        }
+        foreach (self::PAYMENT_SETTINGS as $doc => [$key, $label]) {
+            $s = self::get('settings/' . $doc) ?: [];
+            if (!self::switchedOn($s) || !self::servesRegion($s, $q['regionId'])) {
+                continue;
+            }
+            $currencies = isset(self::GATEWAYS[$key]) ? self::GATEWAYS[$key][2] : null;
+            if ($currencies !== null && !in_array($q['currency'], $currencies, true)) {
+                continue;
+            }
+            if (!isset(self::GATEWAYS[$key])) {
+                $out[$key] = ['label' => $label, 'usable' => false, 'note' => trans('lang.adv_pay_not_for_adverts')];
+            } elseif (($key === 'flutterwave' && !FlutterwaveCheckout::ready($s)) || ($key === 'razorpay' && !RazorpayCheckout::ready($s))) {
+                $out[$key] = ['label' => $label, 'usable' => false, 'note' => trans('lang.adv_pay_not_set_up')];
+            } else {
+                $out[$key] = ['label' => $label, 'usable' => true, 'note' => ''];
+            }
+        }
+        return $out;
+    }
+
+    /** The methods that can take this payment now: key => label (the pay form accepts only these). */
     public static function methods(array $q)
     {
         $methods = [];
-        $ws = self::get('settings/walletSettings') ?: [];
-        if (($ws['isEnabled'] ?? null) === true) {
-            $methods['wallet'] = trans('lang.adv_pay_wallet');
-        }
-        foreach (self::GATEWAYS as $gw => [$doc, $label, $currencies]) {
-            if (!in_array($q['currency'], $currencies, true)) {
-                continue;
-            }
-            $s = self::get('settings/' . $doc) ?: [];
-            $on = ($s['isEnabled'] ?? null) === true || ($s['enable'] ?? null) === true;
-            $regions = (array)($s['regionIds'] ?? []);
-            if ($on && (!$regions || in_array($q['regionId'], $regions, true))) {
-                $methods[$gw] = $label;
+        foreach (self::options($q) as $key => $o) {
+            if ($o['usable']) {
+                $methods[$key] = $o['label'];
             }
         }
         return $methods;
+    }
+
+    /** A gateway's settings document (server side; its secrets never reach a page). */
+    public static function settings($gw)
+    {
+        return isset(self::GATEWAYS[$gw]) ? (self::get('settings/' . self::GATEWAYS[$gw][0]) ?: []) : [];
     }
 
     /* ------------------------------------------------------------ checkout */
@@ -263,6 +332,14 @@ class AdvertPayment
             case 'sebpay_cm': $url = Sebpay::start('cm', self::FLOW, $q['total'], $q['currency'], $reason, $customer, $ok, $ko); break;
             case 'sebpay_gn': $url = Sebpay::start('gn', self::FLOW, $q['total'], $q['currency'], $reason, $customer, $ok, $ko); break;
             case 'pispi': $url = PiSpi::start(self::FLOW, $q['total'], $q['currency'], $reason, $customer, $ok, $ko); break;
+            case 'flutterwave':   // FlutterWave returns to the done page; done() asks FlutterWave about OUR tx_ref
+                $url = FlutterwaveCheckout::start(self::settings('flutterwave'), $id, $q['total'], $q['currency'], $reason, $customer, $ok);
+                break;
+            case 'razorpay':      // a Razorpay order, then our page opens Razorpay Checkout for it
+                $orderId = RazorpayCheckout::order(self::settings('razorpay'), $id, $q['total'], $q['currency']);
+                self::patch('advertisement_checkouts/' . $id, ['gatewayOrderId' => $orderId]);
+                $url = route('advertisement-pay.razorpay', $id);
+                break;
             default: throw new \RuntimeException(trans('lang.adv_pay_method_unavailable'));
         }
         return ['checkoutId' => $id, 'redirect' => $url];
@@ -281,14 +358,23 @@ class AdvertPayment
         return $c;
     }
 
-    /** The gateway's proof (its success-page token), or false. */
-    public static function proof($gateway, array $query)
+    /** The gateway's proof (its success-page token, or for FlutterWave / Razorpay the gateway's own answer), or false. */
+    public static function proof($gateway, array $query, array $checkout = [])
     {
         switch ($gateway) {
             case 'mycoolpay': $p = MyCoolPay::confirmed($query['mycoolpay_token'] ?? null, self::FLOW); break;
             case 'mypvit': $p = MyPVit::confirmed($query['mypvit_token'] ?? null, self::FLOW); break;
             case 'sebpay_cm': case 'sebpay_gn': $p = Sebpay::confirmed($query['sebpay_token'] ?? null, self::FLOW); break;
             case 'pispi': $p = PiSpi::confirmed($query['pispi_token'] ?? null, self::FLOW); break;
+            case 'flutterwave':
+                $p = !empty($checkout['id']) ? FlutterwaveCheckout::verify(self::settings('flutterwave'), $checkout['id']) : false;
+                break;
+            case 'razorpay':
+                $p = !empty($checkout['gatewayOrderId']) && ($query['razorpay_order_id'] ?? '') === $checkout['gatewayOrderId']
+                    ? RazorpayCheckout::verify(self::settings('razorpay'), $checkout['gatewayOrderId'], $query['razorpay_payment_id'] ?? '',
+                        $query['razorpay_signature'] ?? '', $checkout['amount'] ?? 0, $checkout['currency'] ?? '')
+                    : false;
+                break;
             default: $p = false;
         }
         if (!is_array($p)) {
