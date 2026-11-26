@@ -241,7 +241,9 @@
             }
             // #113: the store the advert is for (the copied advert's store, else the current one)
             var copied = localStorage.getItem('copiedAdvertisement');
-            await loadAdvStores(copied ? (JSON.parse(copied).vendorId || '') : '', false);
+            var copiedStoreId = '';
+            try { copiedStoreId = copied ? (JSON.parse(copied).vendorId || '') : ''; } catch (e) {}
+            await loadAdvStores(copiedStoreId, false).catch(function (e) { console.error('[adv store]', e); });
 
         });
 

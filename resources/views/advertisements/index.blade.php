@@ -45,6 +45,7 @@
                                         <th class="delete-all"><input type="checkbox" id="is_active"><label class="col-3 control-label" for="is_active">
                                                 <a id="deleteAll" class="do_not_delete" href="javascript:void(0)"><i class="mdi mdi-delete"></i> {{ trans('lang.all') }}</a></label></th>
                                         <th>{{ trans('lang.ads_title') }}</th>
+                                        <th>{{ trans('lang.adv_store') }}</th>
                                         <th> {{ trans('lang.ads_type') }}</th>
                                         <th> {{ trans('lang.duration') }}</th>
                                         <th> {{ trans('lang.status') }}</th>
@@ -200,15 +201,20 @@
                     const searchValue = data.search.value.toLowerCase();
                     const orderColumnIndex = data.order[0].column;
                     const orderDirection = data.order[0].dir;
-                    const orderableColumns = ['', 'title', 'type', 'duration', 'status', 'priority', ''];
+                    const orderableColumns = ['', 'title', 'storeTitle', 'type', 'duration', 'status', 'priority', ''];
                     const orderByField = orderableColumns[orderColumnIndex];
                     if (searchValue.length >= 3 || searchValue.length === 0) {
                         $('#data-table_processing').show();
                     }
                     try {
 
-                        const Vendor = await getVendorId(vendorUserId);
-                        const querySnapshot = await ref.where('vendorId', "==", Vendor).get();
+                        // #113: the adverts of every store of the owner (an employee: their store), with a Store column
+                        const advStores = await spideliAdvListStores();
+                        const snaps = await Promise.all(Object.keys(advStores).map(function (sid) {
+                            return ref.where('vendorId', "==", sid).get();
+                        }));
+                        const allDocs = [].concat.apply([], snaps.map(function (s) { return s.docs; }));
+                        const querySnapshot = {empty: allDocs.length === 0, docs: allDocs};
                         if (!querySnapshot || querySnapshot.empty) {
                             console.error("No data found in Firestore.");
                             $('#data-table_processing').hide(); // Hide loader
@@ -226,7 +232,8 @@
                             let childData = doc.data();
                             childData.id = doc
                                 .id; // Ensure the document ID is included in the data
-                            childData.vendorId = Vendor;
+                            childData.store = advStores[childData.vendorId] || {};
+                            childData.storeTitle = childData.store.title || '';
 
                             const options = {
                                 year: 'numeric',
@@ -257,6 +264,7 @@
                             if (searchValue) {
                                 if (
                                     (childData.title && childData.title.toString().toLowerCase().includes(searchValue)) ||
+                                    (childData.storeTitle && childData.storeTitle.toString().toLowerCase().includes(searchValue)) ||
                                     (childData.type && childData.type.toString().toLowerCase().includes(searchValue)) ||
                                     (childData.status && childData.status.toString().toLowerCase().includes(searchValue)) ||
                                     (childData.priority && childData.priority.toString().toLowerCase().includes(searchValue)) ||
@@ -307,11 +315,11 @@
                 order: [1, 'asc'],
                 columnDefs: [{
                         orderable: false,
-                        targets: [0, 6]
+                        targets: [0, 7]
                     },
                     {
                         type: "num",
-                        targets: 5
+                        targets: 6
                     }
                 ],
                 "language": datatableLang,
@@ -326,6 +334,49 @@
                 };
             }
         });
+
+        /* #113: the stores whose adverts are listed: every store of the owner (vendors.author), an employee's own store,
+         * else the store the panel is working on. Read once per page. */
+        var advListStoresPromise = null;
+        function spideliAdvListStores() {
+            if (!advListStoresPromise) {
+                advListStoresPromise = (async function () {
+                    var db = firebase.firestore(), out = {};
+                    if (authRole === 'employee') {
+                        if (empVendorId) {
+                            var own = await db.collection('vendors').doc(empVendorId).get();
+                            if (own.exists) { out[own.id] = own.data(); }
+                        }
+                    } else if (vendorUserId) {
+                        var snap = await db.collection('vendors').where('author', '==', vendorUserId).get();
+                        snap.docs.forEach(function (d) { out[d.id] = d.data(); });
+                    }
+                    if (!Object.keys(out).length) {
+                        var current = await getVendorId(vendorUserId);
+                        if (current) {
+                            var cur = await db.collection('vendors').doc(current).get();
+                            out[current] = cur.exists ? cur.data() : {};
+                        }
+                    }
+                    return out;
+                })();
+            }
+            return advListStoresPromise;
+        }
+
+        function spideliAdvEsc(value) {
+            return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // The Store cell, as on My Stores (Store Info): the photo, then the store name linking to the store.
+        function spideliAdvStoreCell(store, storeId) {
+            var photo = store.photo ? store.photo : placeholderImage;
+            var view = '{{ route('stores.view', ':id') }}'.replace(':id', encodeURIComponent(storeId || ''));
+            return '<td><img alt="" style="width:70px;height:70px;object-fit:cover;" src="' + spideliAdvEsc(photo) +
+                '" onerror="this.onerror=null;this.src=\'' + spideliAdvEsc(placeholderImage) + '\'">' +
+                '<a href="' + spideliAdvEsc(view) + '" class="left_space">' + spideliAdvEsc(store.title || '') + '</a></td>';
+        }
 
         async function buildHTML(val) {
             var html = [];
@@ -349,6 +400,9 @@
                 'for="is_open_' + id + '" ></label></td>');
 
             html.push('<td><a href="' + advertisementsView + '">' + val.title + '</a></td>');
+
+            // #113: Store column, as My Stores' Store Info: the store photo and its name (link to the store)
+            html.push(spideliAdvStoreCell(val.store || {}, val.vendorId));
 
             if (val.type === 'restaurant_promotion') {
                 html.push('<td>Restaurant Promotion</td>');

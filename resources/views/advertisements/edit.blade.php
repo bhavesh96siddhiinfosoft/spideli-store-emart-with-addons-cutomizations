@@ -303,7 +303,7 @@
                 if (advStoreLocked) {
                     $('.adv_store_help').text(@json(trans('lang.adv_store_locked')));
                 }
-            });
+            }).catch(function (e) { console.error('[adv store]', e); });
             currentStatus = data.status;
             $(".title").val(data.title);
             var title = data.title;
