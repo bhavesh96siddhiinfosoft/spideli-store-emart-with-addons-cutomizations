@@ -1305,6 +1305,7 @@ return [
     'adv_store_help' => 'The store this advert is for (your stores, in every region).',
     'adv_store_error' => 'Please select the store.',
     'adv_store_locked' => 'This advert is paid: it stays with its store.',
+    'adv_store_no_match' => 'No store matches',
     'adv_pay_title' => 'Pay the advert',
     'adv_pay_now' => 'Pay now',
     'adv_pay_days' => 'Days',

@@ -6,8 +6,10 @@
     /* An owner sees all their stores (any region), each named with its region; an employee only their own store.
      * preselectId: the advert's store (edit, copy), else the store the panel is working on.
      * locked: the store cannot change (a paid advert, or an employee).
+     * placeholder (Create): nothing is chosen for the owner, who must pick a store; the text shown until then.
      * Every read is guarded: whatever fails, the store the panel is working on is still offered. */
-    async function loadAdvStores(preselectId, locked) {
+    async function loadAdvStores(preselectId, locked, placeholder) {
+        var choose = !!placeholder && authRole !== 'employee';   // an employee has one store: nothing to choose
         var db = firebase.firestore();
         var byId = {};
         function add(id, data) {
@@ -64,29 +66,38 @@
         }));
         stores.sort(function (a, b) { return String(a.title || '').localeCompare(String(b.title || '')); });
         var $s = $('#adv_store');
-        if ($.fn.select2 && $s.hasClass('select2-hidden-accessible')) {
-            $s.select2('destroy');
+        if ($.fn.chosen && $s.data('chosen')) {
+            $s.chosen('destroy');
         }
         $s.empty();
         advStoresById = {};
+        if (choose) {
+            $s.append('<option value=""></option>');   // Chosen shows the placeholder on this empty option
+        }
         stores.forEach(function (s) {
             advStoresById[s.id] = s;
             var label = (s.title || s.id) + (regionNames[s.regionId] ? ' · ' + regionNames[s.regionId] : '');
             $s.append($('<option></option>').attr('value', s.id).text(label));   // .text(): names are not HTML
         });
         var pick = preselectId && advStoresById[preselectId] ? preselectId : '';
-        if (!pick && current && advStoresById[current.id]) {
+        if (!pick && !choose && current && advStoresById[current.id]) {
             pick = current.id;
         }
-        if (!pick && stores.length) {
+        if (!pick && !choose && stores.length) {
             pick = stores[0].id;
         }
         $s.val(pick);
-        $s.prop('disabled', !!locked || authRole === 'employee' || stores.length < 2);
-        if ($.fn.select2) {
-            $s.select2({width: '100%'});
+        $s.prop('disabled', !!locked || authRole === 'employee' || (!choose && stores.length < 2));
+        // Chosen, like the admin's Delivery Zones: a search box, the matching stores, the highlighted one in blue
+        if ($.fn.chosen) {
+            $s.show().chosen({
+                width: '100%',
+                search_contains: true,
+                placeholder_text_single: String(placeholder || ''),
+                no_results_text: @json(trans('lang.adv_store_no_match'))
+            });
+            $s.trigger('chosen:updated');
         }
-        $s.trigger('change.select2');
         $s.off('change.advstore').on('change.advstore', function () { spideliAdvStoreRating(advStoresById[$(this).val()]); });
         spideliAdvStoreRating(advStoresById[pick]);
         return pick;
@@ -97,11 +108,9 @@
         return v && advStoresById[v] ? v : '';
     }
 
-    // The preview shows the chosen store's rating and number of reviews.
+    // The preview shows the chosen store's rating and number of reviews (none chosen yet: 0).
     function spideliAdvStoreRating(store) {
-        if (!store) {
-            return;
-        }
+        store = store || {};
         var count = parseFloat(store.reviewsCount) || 0, sum = parseFloat(store.reviewsSum) || 0;
         var rating = count > 0 && sum > 0 ? Math.round((sum / count) * 10) / 10 : 0;
         $('#rating_data').html(rating);

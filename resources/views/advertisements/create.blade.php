@@ -223,7 +223,10 @@
                 $('#preview-review').html((reviewsCount == 0) ? '(' + reviewsCount + ')' : '(+' + reviewsCount + ')');
             }
         })
-         $(document).ready(async function() {   
+        /* #113: the ready handler must be a plain function. The panel's jQuery 3.2.0 does not count an
+         * async function as a function and silently skips it, so this handler (permission check and the
+         * Store list) never ran. The async body runs inside. */
+         $(document).ready(function() { (async function() {
 
             if (authRole === 'employee') {               
                 const perm = await getEmployeePermissionForTitle(vendorUserId, "Advertisement");
@@ -239,13 +242,11 @@
                     return;
                 }
             }
-            // #113: the store the advert is for (the copied advert's store, else the current one)
-            var copied = localStorage.getItem('copiedAdvertisement');
-            var copiedStoreId = '';
-            try { copiedStoreId = copied ? (JSON.parse(copied).vendorId || '') : ''; } catch (e) {}
-            await loadAdvStores(copiedStoreId, false).catch(function (e) { console.error('[adv store]', e); });
+            // #113: the store the advert is for. Nothing is chosen for the owner (not even for a copied advert):
+            // they pick it, and the save is refused until they do. An employee gets their own store.
+            await loadAdvStores('', false, @json(trans('lang.select_vendor'))).catch(function (e) { console.error('[adv store]', e); });
 
-        });
+        })().catch(function (e) { console.error('[adv create]', e); }); });
 
         function setDate(startDate = null, endDate = null) {
             if (!startDate || !endDate) {
