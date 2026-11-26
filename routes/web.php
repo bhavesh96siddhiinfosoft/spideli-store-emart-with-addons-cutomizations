@@ -195,6 +195,11 @@ Route::middleware(['check.subscription'])->group(function () {
     Route::get('/advertisements/edit/{id}', [App\Http\Controllers\AdvertisementsController::class, 'edit'])->name('advertisements.edit');
     Route::get('/advertisements/view/{id}', [App\Http\Controllers\AdvertisementsController::class, 'view'])->name('advertisements.view');
     Route::get('/advertisement/chat/{id}', [App\Http\Controllers\AdvertisementsController::class, 'chat'])->name('advertisement.chat');
+    // #113: the store pays an approved advert (wallet or the client's gateways)
+    Route::get('/advertisements/pay/{id}', [App\Http\Controllers\AdvertPaymentController::class, 'show'])->where('id', '[A-Za-z0-9_-]{6,64}')->name('advertisement-pay.show');
+    Route::post('/advertisements/pay/{id}', [App\Http\Controllers\AdvertPaymentController::class, 'pay'])->where('id', '[A-Za-z0-9_-]{6,64}')->middleware('throttle:20,1')->name('advertisement-pay.pay');
+    Route::get('/advertisements/pay/checkout/{id}/done', [App\Http\Controllers\AdvertPaymentController::class, 'done'])->where('id', 'adc_[0-9]+_[0-9a-f]{10}')->name('advertisement-pay.done');
+    Route::get('/advertisements/pay/checkout/{id}/failed', [App\Http\Controllers\AdvertPaymentController::class, 'failed'])->where('id', 'adc_[0-9]+_[0-9a-f]{10}')->name('advertisement-pay.failed');
 
     Route::get('deliveryman', [App\Http\Controllers\DeliverymanController::class, 'index'])->name('deliveryman');
     Route::get('deliveryman/create', [App\Http\Controllers\DeliverymanController::class, 'create'])->name('deliveryman.create');

@@ -93,6 +93,10 @@
                                                 <label class="col-12 control-label"><strong>{{ trans('lang.payment_status') }}:</strong>
                                                     <span id="paymentStatus"></span></label>
                                             </div>
+                                            {{-- #113: pay an approved advert, or what was paid online --}}
+                                            <div class="form-group row widt-100 gendetail-col adv-pay-row d-none">
+                                                <div class="col-12" id="advPayBox"></div>
+                                            </div>
                                             <div class="form-group row widt-100 gendetail-col">
                                                 <label class="col-12 control-label"><strong>{{ trans('lang.status') }}:</strong>
                                                     <span id="status"></span></label>
@@ -135,6 +139,27 @@
         });
         var ref = database.collection('advertisements').where("id", "==", id);
 
+        /* #113: an approved, unpaid, not yet ended advert gets a Pay button (the price is on the pay page, computed on
+         * the server); a paid one shows what was paid online. Text from Firestore goes in with .text(). */
+        function spideliAdvertPayBox(data) {
+            var $box = $('#advPayBox').empty();
+            var ended = data.endDate && data.endDate.toDate && data.endDate.toDate().getTime() < Date.now();
+            if (data.paymentStatus === true) {
+                var p = data.payment || null;
+                if (p && p.amount != null) {
+                    $box.append($('<span class="text-muted">').text(@json(trans('lang.adv_pay_paid_online')) + ' ' + p.amount + ' ' + (p.currency || '') +
+                        ' (' + p.days + ' × ' + p.pricePerDay + ') · ' + (p.methodLabel || p.method || '')));
+                    $('.adv-pay-row').removeClass('d-none');
+                }
+                return;
+            }
+            if (data.status === 'approved' && !ended) {
+                var url = "{{ route('advertisement-pay.show', ':id') }}".replace(':id', encodeURIComponent(data.id));
+                $box.append($('<a class="btn btn-primary btn-sm">').attr('href', url).text(@json(trans('lang.adv_pay_now'))));
+                $('.adv-pay-row').removeClass('d-none');
+            }
+        }
+
         ref.get().then(async function(snapshots) {
             var data = snapshots.docs[0].data();
             $('#advId').html(data.id);
@@ -173,6 +198,7 @@
                 $('#paymentStatus').html('<span class="badge badge-danger py-2 px-3">{{ trans('lang.unpaid') }}</span>');
                 $("#update_pay_status").prop('checked', false);
             }
+            spideliAdvertPayBox(data);
             var status = data.status.charAt(0).toUpperCase() + data.status.slice(1);
             if (data.hasOwnProperty('isPaused') && data.isPaused) {
                 $('.paused-note-div').removeClass('d-none');

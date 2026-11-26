@@ -384,6 +384,11 @@
                 '" class="do_not_delete" name="advertisements-delete" href="javascript:void(0)"><i class="fa fa-trash"></i></a>';
             action = action + '<a id="' + val.id +
                 '"  name="advertisements-copy" href="javascript:void(0)"><i class="fa fa-copy"></i></a><a href="'+ advertisementsChat +'"><i class="fa fa-commenting"></i></a>';
+            // #113: an approved advert not paid yet can be paid here (wallet or gateway)
+            if (val.status === 'Approved' && val.paymentStatus !== true) {
+                var advertisementsPay = '{{ route('advertisement-pay.show', ':id') }}'.replace(':id', encodeURIComponent(id));
+                action = action + '<a href="' + advertisementsPay + '" title="{{ trans('lang.adv_pay_now') }}"><i class="fa fa-credit-card text-success"></i></a>';
+            }
 
             if (type != 'pending') {
                 if (val.status == "Running") {
