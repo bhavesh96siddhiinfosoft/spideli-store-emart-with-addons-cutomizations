@@ -161,7 +161,9 @@
         let currentPermissions = {
             isActive: true   
         };
-        ref = database.collection('advertisements').where("status", "in", ["approved", "canceled"]);
+        // #113: the Ad List also shows the adverts waiting for the admin (new: pending, edited: updated) with a
+        // Pending badge, so a store sees what it just created; the Pending menu still lists only those.
+        ref = database.collection('advertisements').where("status", "in", ["approved", "canceled", "pending", "updated"]);
         if (type == 'pending') {
             ref = database.collection('advertisements').where("status", "in", ["pending", "updated"]);
         }
