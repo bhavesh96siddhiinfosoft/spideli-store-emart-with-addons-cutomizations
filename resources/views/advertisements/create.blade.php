@@ -26,6 +26,7 @@
                                         <div class="tab-pane active" id="advertisement_info">
                                             <fieldset>
                                                 <legend>{{ trans('lang.advertisement_create') }}</legend>
+                                                @include('advertisements.partials.store_select')
                                                 <div class="form-group row width-100">
                                                     <label class="col-3 control-label">{{ trans('lang.adv_title') }}</label>
                                                     <div class="col-7">
@@ -176,6 +177,7 @@
     </div>
 @endsection
 @section('scripts')
+    @include('advertisements.partials.store_select_js')
     <script>
         var database = firebase.firestore();
         var ref = database.collection('advertisements');
@@ -236,7 +238,10 @@
                     $('.restaurant_payout_create').html('<p class="text-center text-danger font-weight-bold">{{ trans("lang.no_permission") }}</p>');
                     return;
                 }
-            } 
+            }
+            // #113: the store the advert is for (the copied advert's store, else the current one)
+            var copied = localStorage.getItem('copiedAdvertisement');
+            await loadAdvStores(copied ? (JSON.parse(copied).vendorId || '') : '', false);
 
         });
 
@@ -421,6 +426,13 @@
                 }
             }
 
+            if (!selectedAdvStoreId()) {   // #113
+                $(".error_top").show();
+                $(".error_top").html("");
+                $(".error_top").append("<p>{{ trans('lang.adv_store_error') }}</p>");
+                window.scrollTo(0, 0);
+                return;
+            }
             if (title == '') {
                 $(".error_top").show();
                 $(".error_top").html("");
@@ -484,7 +496,7 @@
                             'coverImage': coverIMG,
                             'profileImage': profileIMG,
                             'video': videoFile,
-                            'vendorId': (authRole == 'vendor') ? vendorId : empVendorId,
+                            'vendorId': selectedAdvStoreId(),   // #113: the chosen store
                             'priority': "N/A",
                             'type': advType,
                             'showRating': rating,
@@ -526,7 +538,7 @@
                                     'coverImage': coverIMG,
                                     'profileImage': profileIMG,
                                     'video': videoFile,
-                                    'vendorId': vendorId,
+                                    'vendorId': selectedAdvStoreId(),   // #113: the chosen store
                                     'priority': "N/A",
                                     'type': advType,
                                     'showRating': rating,

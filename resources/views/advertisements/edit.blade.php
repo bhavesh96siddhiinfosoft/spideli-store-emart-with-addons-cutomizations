@@ -26,6 +26,7 @@
                                         <div class="tab-pane active" id="advertisement_info">
                                             <fieldset>
                                                 <legend>{{ trans('lang.advertisement_edit') }}</legend>
+                                                @include('advertisements.partials.store_select')
                                                 <div class="form-group row width-100">
                                                     <label class="col-3 control-label">{{ trans('lang.adv_title') }}</label>
                                                     <div class="col-7">
@@ -175,6 +176,7 @@
     </div>
 @endsection
 @section('scripts')
+    @include('advertisements.partials.store_select_js')
     <script>
         var database = firebase.firestore();
         var id = "{{ $id }}";
@@ -268,6 +270,7 @@
             }
         });
 
+        var advOriginalStoreId = '', advStoreLocked = false;   // #113
         async function getVendorData(vendorId) {
             database.collection('vendors').where('id', "==", vendorId).get().then(async function(vendorSnapshots) {
                 if (vendorSnapshots.docs.length > 0) {
@@ -293,6 +296,14 @@
         ref.get().then(async function(snapshots) {
             var data = snapshots.docs[0].data();
             getVendorData(data.vendorId);
+            // #113: the store select; a paid advert keeps its store (its price was for that store's zone)
+            advOriginalStoreId = data.vendorId || '';
+            advStoreLocked = data.paymentStatus === true;
+            loadAdvStores(advOriginalStoreId, advStoreLocked).then(function () {
+                if (advStoreLocked) {
+                    $('.adv_store_help').text(@json(trans('lang.adv_store_locked')));
+                }
+            });
             currentStatus = data.status;
             $(".title").val(data.title);
             var title = data.title;
@@ -392,6 +403,13 @@
                 }
             }
 
+            if (!selectedAdvStoreId()) {   // #113
+                $(".error_top").show();
+                $(".error_top").html("");
+                $(".error_top").append("<p>{{ trans('lang.adv_store_error') }}</p>");
+                window.scrollTo(0, 0);
+                return;
+            }
             if (title == '') {
                 $(".error_top").show();
                 $(".error_top").html("");
@@ -447,6 +465,7 @@
                                 'type': advType,
                                 'showRating': rating,
                                 'showReview': review,
+                                'vendorId': advStoreLocked ? advOriginalStoreId : selectedAdvStoreId(),   // #113
                                 'startDate': startDate,
                                 'endDate': endDate,
                                 'status': (currentStatus == 'approved' || currentStatus == 'canceled') ? 'updated' : currentStatus

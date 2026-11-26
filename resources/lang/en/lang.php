@@ -1301,6 +1301,10 @@ return [
     'psc_title' => 'Admin Product & Service Commission',
     'verified' => 'Verified',
     // #113 advert payment
+    'adv_store' => 'Store',
+    'adv_store_help' => 'The store this advert is for (your stores, in every region).',
+    'adv_store_error' => 'Please select the store.',
+    'adv_store_locked' => 'This advert is paid: it stays with its store.',
     'adv_pay_title' => 'Pay the advert',
     'adv_pay_now' => 'Pay now',
     'adv_pay_days' => 'Days',
