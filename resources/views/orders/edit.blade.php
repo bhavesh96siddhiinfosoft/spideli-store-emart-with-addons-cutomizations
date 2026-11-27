@@ -42,6 +42,11 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="order_detail-top-box">
+                                        {{-- #115: one of several orders the customer placed together from different stores --}}
+                                        <div class="alert alert-info ms-group-box d-none">
+                                            <strong>{{ trans('lang.ms_order_group') }}</strong>
+                                            <div class="ms-group-text"></div>
+                                        </div>
                                         <div class="form-group row widt-100 gendetail-col">
                                             <label class="col-12 control-label"><strong>{{ trans('lang.date_created') }}
                                                     : </strong><span id="createdAt"></span></label>
@@ -496,6 +501,15 @@
         var subscriptionModel = false;
         var commissionModel = false;
         var database = firebase.firestore();
+        /* #115: a store sees that the order is part of a multi-store purchase (not the other stores' orders). */
+        function spideliShowMultiStoreNote(order) {
+            var size = parseInt(order && order.multiStoreGroupSize, 10);
+            if (!order || !order.multiStoreGroupId || !(size > 1)) {
+                return;
+            }
+            $('.ms-group-box .ms-group-text').text(@json(trans('lang.ms_order_group_store_text')).replace(':count', String(size)));
+            $('.ms-group-box').removeClass('d-none');
+        }
         var subscriptionBusinessModel = database.collection('settings').doc("vendor");
         var paymentMethod = '';
         var sectionId = "";
@@ -698,6 +712,7 @@
             jQuery("#data-table_processing").show();
             ref.get().then(async function(snapshots) {
                 var order = snapshots.docs[0].data();
+                spideliShowMultiStoreNote(order);   // #115
                 vendor_zoneId = order.vendor?.zoneId || '';
                 packagingChargeEnable = order.packagingChargeEnable;
                 await getDeliverymanList(order.vendorID);

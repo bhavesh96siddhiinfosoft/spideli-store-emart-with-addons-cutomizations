@@ -1339,6 +1339,11 @@ return [
     'adv_pay_not_confirmed' => 'The payment is not confirmed.',
     'adv_pay_paid_not_done' => 'Your payment was received but the advert could not be marked paid. The admin has been told and will complete it.',
     'adv_pay_paid_online' => 'Paid online:',
+    // #115 multi-store purchase
+    'ms_order_badge' => 'Multi-store',
+    'ms_order_badge_title' => 'One of :count orders the customer placed together from different stores',
+    'ms_order_group' => 'Multi-store purchase',
+    'ms_order_group_store_text' => 'The customer bought from :count stores together and paid once. This order holds only your products, with your share of the delivery charge, discount and tip; the other stores prepare and deliver their own orders.',
 ];
 ?>
 

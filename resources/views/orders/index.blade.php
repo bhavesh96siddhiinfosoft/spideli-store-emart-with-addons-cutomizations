@@ -571,6 +571,17 @@
 
     });
 
+    /* #115: one of several orders the customer placed together from different stores (one cart, one payment):
+     * vendor_orders.multiStoreGroupId / multiStoreGroupSize, written by the website. */
+    function spideliMultiStoreBadge(order) {
+        var size = parseInt(order && order.multiStoreGroupSize, 10);
+        if (!order || !order.multiStoreGroupId || !(size > 1)) {
+            return '';
+        }
+        var title = @json(trans('lang.ms_order_badge_title')).replace(':count', String(size));
+        return ' <span class="badge badge-info ml-1" title="' + $('<div>').text(title).html() + '">' + @json(trans('lang.ms_order_badge')) + ' · ' + size + '</span>';
+    }
+
     async function buildHTML(val) {
         html=[];
         var id = val.id;
@@ -581,7 +592,7 @@
         printRoute = printRoute.replace(':id', id);
 
 
-        html.push('<a href="'+route1+'">' + val.id + '</a>');
+        html.push('<a href="'+route1+'">' + val.id + '</a>' + spideliMultiStoreBadge(val));   // #115
         html.push(val.clientName);
         /* The store the panel is working on. Since the list was scoped to that
          * store, every row carries the same name - it is a "you are here" marker

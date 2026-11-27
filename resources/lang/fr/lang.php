@@ -1277,4 +1277,9 @@ Ratio d’image : 2:1',
     'adv_pay_not_confirmed' => 'Le paiement n\'est pas confirmé.',
     'adv_pay_paid_not_done' => 'Votre paiement a été reçu mais la publicité n\'a pas pu être marquée payée. L\'administrateur est prévenu et va la finaliser.',
     'adv_pay_paid_online' => 'Payé en ligne :',
+    // #115 multi-store purchase
+    'ms_order_badge' => 'Multi-établissements',
+    'ms_order_badge_title' => "L'une des :count commandes passées ensemble par le client dans différents établissements",
+    'ms_order_group' => 'Achat multi-établissements',
+    'ms_order_group_store_text' => 'Le client a acheté dans :count établissements en même temps et a payé une fois. Cette commande ne contient que vos produits, avec votre part des frais de livraison, de la remise et du pourboire ; les autres établissements préparent et livrent leurs propres commandes.',
 ];
